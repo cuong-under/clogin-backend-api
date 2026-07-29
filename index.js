@@ -4,12 +4,91 @@ const path = require('path');
 const crypto = require('crypto');
 
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'licenses_db.json');
+
+// Path & Volume setup
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Migrate legacy files to /data/ if they exist
+const LEGACY_FILES = ['licenses_db.json', 'owners_db.json', 'workers_db.json', 'audit_cloud_db.json', 'profiles_cloud_db.json'];
+LEGACY_FILES.forEach(file => {
+  const oldPath = path.join(__dirname, file);
+  const newPath = path.join(DATA_DIR, file);
+  if (fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+    try {
+      fs.renameSync(oldPath, newPath);
+      console.log(`Migrated ${file} to data/ directory`);
+    } catch (e) {
+      console.error(`Failed to migrate ${file}:`, e);
+    }
+  }
+});
+
+const DB_FILE = path.join(DATA_DIR, 'licenses_db.json');
+const OWNERS_DB = path.join(DATA_DIR, 'owners_db.json');
+const WORKERS_DB = path.join(DATA_DIR, 'workers_db.json');
+const AUDIT_DB = path.join(DATA_DIR, 'audit_cloud_db.json');
+const PROFILES_DB = path.join(DATA_DIR, 'profiles_cloud_db.json');
+
+// Secrets & Security Config
+const JWT_SECRET = process.env.JWT_SECRET || 'clogin-jwt-secret-2026';
+if (!process.env.JWT_SECRET) {
+  console.warn('WARNING: JWT_SECRET not set in env vars, using default development fallback!');
+}
+
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'CloginAdmin2026!';
+if (!process.env.ADMIN_PASSWORD) {
+  console.warn('WARNING: ADMIN_PASSWORD not set in env vars, using default development fallback!');
+}
+
+const ADMIN_COOKIE_SECRET = crypto.createHmac('sha256', JWT_SECRET).update('clogin_admin_cookie_salt').digest('hex');
+const JWT_TTL = 3600;
+
+// Rate Limiter Memory Store
+const rateLimitStore = new Map();
+function checkRateLimit(ip, endpoint, maxHits, windowMs) {
+  const now = Date.now();
+  const key = `${ip}:${endpoint}`;
+  const record = rateLimitStore.get(key) || { count: 0, resetAt: now + windowMs };
+  if (now > record.resetAt) {
+    record.count = 0;
+    record.resetAt = now + windowMs;
+  }
+  record.count += 1;
+  rateLimitStore.set(key, record);
+  return record.count <= maxHits;
+}
+
+// Cleanup rate limiter every 10 mins
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, record] of rateLimitStore.entries()) {
+    if (now > record.resetAt) rateLimitStore.delete(key);
+  }
+}, 600000);
+
+// Helper: Error Response Contract Standard
+function sendError(res, statusCode, code, message) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.writeHead(statusCode);
+  return res.end(JSON.stringify({
+    error: { code, message }
+  }));
+}
+
+// JSON DB Load/Save Helpers
+function loadJsonDb(fp, def) {
+  try { if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) {}
+  return def;
+}
+function saveJsonDb(fp, d) {
+  try { fs.writeFileSync(fp, JSON.stringify(d, null, 2), 'utf8'); } catch (e) {}
+}
 
 let licensesMap = new Map();
-
-function loadDb() {
+function loadLicensesDb() {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
@@ -42,10 +121,10 @@ function loadDb() {
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     active_hwids: new Map(),
   });
-  saveDb();
+  saveLicensesDb();
 }
 
-function saveDb() {
+function saveLicensesDb() {
   try {
     const list = Array.from(licensesMap.values()).map((l) => ({
       key: l.key,
@@ -58,26 +137,22 @@ function saveDb() {
   } catch (e) {}
 }
 
-loadDb();
-
-// --- Cloud Auth System ---
-const OWNERS_DB = path.join(__dirname, 'owners_db.json');
-const WORKERS_DB = path.join(__dirname, 'workers_db.json');
-const JWT_SECRET = process.env.JWT_SECRET || 'clogin-jwt-secret-2026';
-const JWT_TTL = 3600;
-
-function loadJsonDb(fp, def) {
-  try { if (fs.existsSync(fp)) return JSON.parse(fs.readFileSync(fp, 'utf8')); } catch (e) {}
-  return def;
-}
-function saveJsonDb(fp, d) {
-  try { fs.writeFileSync(fp, JSON.stringify(d, null, 2), 'utf8'); } catch (e) {}
-}
+loadLicensesDb();
 
 let ownersDb = loadJsonDb(OWNERS_DB, []);
 let workersDb = loadJsonDb(WORKERS_DB, []);
+let auditDb = loadJsonDb(AUDIT_DB, []);
+let profilesDb = loadJsonDb(PROFILES_DB, []);
+
 function saveOwners() { saveJsonDb(OWNERS_DB, ownersDb); }
 function saveWorkers() { saveJsonDb(WORKERS_DB, workersDb); }
+function saveAudit() {
+  if (auditDb.length > 1000) {
+    auditDb = auditDb.slice(-1000);
+  }
+  saveJsonDb(AUDIT_DB, auditDb);
+}
+function saveProfiles() { saveJsonDb(PROFILES_DB, profilesDb); }
 
 function hashPw(pw) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -99,44 +174,54 @@ function signJwt(payload) {
   const p = b64url(JSON.stringify(payload));
   return `${h}.${p}.${crypto.createHmac('sha256', JWT_SECRET).update(`${h}.${p}`).digest('base64url')}`;
 }
+
 function verifyJwt(token) {
   try {
     const parts = token.split('.');
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return { valid: false, reason: 'INVALID' };
     const e = crypto.createHmac('sha256', JWT_SECRET).update(`${parts[0]}.${parts[1]}`).digest('base64url');
-    if (parts[2] !== e) return null;
+    if (parts[2] !== e) return { valid: false, reason: 'INVALID' };
     const pl = JSON.parse(b64urld(parts[1]));
-    return pl.exp && pl.exp < Math.floor(Date.now() / 1000) ? null : pl;
-  } catch (e) { return null; }
+    if (pl.exp && pl.exp < Math.floor(Date.now() / 1000)) {
+      return { valid: false, reason: 'EXPIRED' };
+    }
+    return { valid: true, payload: pl };
+  } catch (e) {
+    return { valid: false, reason: 'INVALID' };
+  }
 }
+
 function authMw(req) {
   const a = req.headers['authorization'];
-  return a && a.startsWith('Bearer ') ? verifyJwt(a.slice(7)) : null;
+  if (!a || !a.startsWith('Bearer ')) return null;
+  return verifyJwt(a.slice(7));
 }
 
-function uuid() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }); }
+function uuid() { return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }); }
 
-const AUDIT_DB = path.join(__dirname, 'audit_cloud_db.json');
-let auditDb = loadJsonDb(AUDIT_DB, []);
-function saveAudit() { saveJsonDb(AUDIT_DB, auditDb); }
-
-function requireOwner(payload) {
-  if (!payload || payload.type !== 'owner') return null;
-  return ownersDb.find(o => o.id === payload.sub);
+function requireOwner(authResult) {
+  if (!authResult || !authResult.valid || authResult.payload.type !== 'owner') return null;
+  return ownersDb.find(o => o.id === authResult.payload.sub);
 }
-
-const PROFILES_DB = path.join(__dirname, 'profiles_cloud_db.json');
-let profilesDb = loadJsonDb(PROFILES_DB, []);
-function saveProfiles() { saveJsonDb(PROFILES_DB, profilesDb); }
 
 function parseJson(req) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk) => { body += chunk.toString(); });
+    let size = 0;
+    const MAX_SIZE = 1024 * 1024; // 1MB limit
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_SIZE) {
+        req.destroy();
+        return reject(new Error('PAYLOAD_TOO_LARGE'));
+      }
+      body += chunk.toString();
+    });
     req.on('end', () => {
       if (!body || !body.trim()) return resolve({});
       try { resolve(JSON.parse(body)); } catch (e) { resolve({}); }
     });
+    req.on('error', (err) => reject(err));
   });
 }
 
@@ -154,11 +239,22 @@ function getCookies(req) {
 
 function isAdminAuthed(req) {
   const cookies = getCookies(req);
-  return cookies['clogin_admin_session'] === 'authenticated_2026_clogin_secret';
+  return cookies['clogin_admin_session'] === ADMIN_COOKIE_SECRET;
+}
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
 }
 
 const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS Security Whitelist
+  const origin = req.headers.origin;
+  const allowedOrigins = ['tauri://localhost', 'http://localhost', 'https://api-clogin.nghemmo.com'];
+  if (origin && (allowedOrigins.includes(origin) || origin.startsWith('http://localhost:'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
 
@@ -174,137 +270,185 @@ const server = http.createServer(async (req, res) => {
     reqUrl = { pathname: req.url.split('?')[0], searchParams: new URLSearchParams() };
   }
   const pathname = reqUrl.pathname;
-  const host = (req.headers.host || '').toLowerCase();
+  const ip = getClientIp(req);
 
-  // --- API Endpoints ---
+  // Parse Body with Size Check
+  let body = {};
+  if (req.method === 'POST' || req.method === 'PUT') {
+    try {
+      body = await parseJson(req);
+    } catch (err) {
+      if (err.message === 'PAYLOAD_TOO_LARGE') {
+        return sendError(res, 413, 'PAYLOAD_TOO_LARGE', 'Dung lượng request vượt quá giới hạn 1MB');
+      }
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Request body không hợp lệ');
+    }
+  }
+
+  // --- Health Endpoint ---
   if (pathname === '/health') {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
   }
 
-  // --- Cloud Auth Endpoints ---
+  // --- Auth Endpoints ---
   if (req.method === 'POST' && pathname === '/v1/auth/register') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const body = await parseJson(req);
+    if (!checkRateLimit(ip, 'register', 3, 3600000)) { // 3 attempts per hour
+      return sendError(res, 429, 'RATE_LIMITED', 'Quá nhiều lần thử đăng ký, vui lòng thử lại sau 1 giờ');
+    }
     const { email, password, license_key } = body;
-    if (!email || !password || !license_key) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Thiếu email, password hoặc license_key' })); }
+    if (!email || !password || !license_key) {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Thiếu email, password hoặc license_key');
+    }
     const lic = licensesMap.get(license_key);
-    if (!lic) { res.writeHead(404); return res.end(JSON.stringify({ error: 'License Key không hợp lệ' })); }
-    if (lic.expires_at && new Date(lic.expires_at) < new Date()) { res.writeHead(403); return res.end(JSON.stringify({ error: 'License Key đã hết hạn' })); }
-    if (ownersDb.some(o => o.email === email)) { res.writeHead(409); return res.end(JSON.stringify({ error: 'Email đã được đăng ký' })); }
+    if (!lic) {
+      return sendError(res, 404, 'LICENSE_INVALID', 'License Key không hợp lệ');
+    }
+    if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
+      return sendError(res, 400, 'LICENSE_EXPIRED', 'License Key đã hết hạn');
+    }
+    if (ownersDb.some(o => o.email === email)) {
+      return sendError(res, 409, 'DUPLICATE_EMAIL', 'Email đã được đăng ký');
+    }
     const owner = { id: uuid(), email, password_hash: hashPw(password), license_key, max_worker_slots: 3, created_at: new Date().toISOString() };
     ownersDb.push(owner); saveOwners();
     const token = signJwt({ sub: owner.id, type: 'owner', owner_id: owner.id });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ owner_id: owner.id, token }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/auth/login') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const body = await parseJson(req);
+    if (!checkRateLimit(ip, 'login', 10, 900000)) { // 10 attempts per 15 mins
+      return sendError(res, 429, 'RATE_LIMITED', 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 15 phút');
+    }
     const { email, password } = body;
-    if (!email || !password) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Thiếu email hoặc password' })); }
+    if (!email || !password) {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Thiếu email hoặc password');
+    }
     let user = ownersDb.find(o => o.email === email);
     let userType = 'owner';
     if (!user) { user = workersDb.find(w => w.email === email); userType = 'worker'; }
-    if (!user || !verifyPw(password, user.password_hash)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Email hoặc mật khẩu không đúng' })); }
-    if (userType === 'worker' && !user.active) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Tài khoản đã bị vô hiệu hóa' })); }
+    if (!user || !verifyPw(password, user.password_hash)) {
+      return sendError(res, 401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu không đúng');
+    }
+    if (userType === 'worker' && !user.active) {
+      return sendError(res, 403, 'FORBIDDEN', 'Tài khoản worker đã bị vô hiệu hóa');
+    }
     const ownerId = userType === 'owner' ? user.id : user.owner_id;
     const token = signJwt({ sub: user.id, type: userType, owner_id: ownerId });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ token, user_type: userType, user_id: user.id, owner_id: ownerId, email: user.email, name: user.name || '' }));
   }
 
   if (pathname === '/v1/auth/me') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ hoặc đã hết hạn' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) {
+      return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    }
+    const payload = authRes.payload;
     if (payload.type === 'owner') {
       const owner = ownersDb.find(o => o.id === payload.sub);
-      if (!owner) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy tài khoản' })); }
+      if (!owner) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.writeHead(200);
       return res.end(JSON.stringify({ user_id: owner.id, user_type: 'owner', email: owner.email, name: '', owner_id: owner.id }));
     }
     const worker = workersDb.find(w => w.id === payload.sub);
-    if (!worker) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy tài khoản' })); }
+    if (!worker) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy tài khoản');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ user_id: worker.id, user_type: 'worker', email: worker.email, name: worker.name || '', owner_id: worker.owner_id }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/auth/refresh') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) {
+      return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    }
+    const payload = authRes.payload;
     const token = signJwt({ sub: payload.sub, type: payload.type, owner_id: payload.owner_id });
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ token }));
   }
 
   // --- Team Management ---
   if (req.method === 'GET' && pathname === '/v1/team/workers') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const list = workersDb.filter(w => w.owner_id === owner.id).map(w => ({ id: w.id, email: w.email, name: w.name, active: w.active, created_at: w.created_at }));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ workers: list }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/team/workers') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
-    const body = await parseJson(req);
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const { email, password, name } = body;
-    if (!email || !password) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Thiếu email hoặc password' })); }
-    if (workersDb.some(w => w.owner_id === owner.id && w.email === email)) { res.writeHead(409); return res.end(JSON.stringify({ error: 'Email worker đã tồn tại' })); }
+    if (!email || !password) return sendError(res, 400, 'VALIDATION_ERROR', 'Thiếu email hoặc password');
+    if (workersDb.some(w => w.owner_id === owner.id && w.email === email)) {
+      return sendError(res, 409, 'DUPLICATE_EMAIL', 'Email worker đã tồn tại');
+    }
     const activeCount = workersDb.filter(w => w.owner_id === owner.id && w.active).length;
-    if (activeCount >= owner.max_worker_slots) { res.writeHead(403); return res.end(JSON.stringify({ error: `Đã đạt giới hạn ${owner.max_worker_slots} worker slots` })); }
+    if (activeCount >= owner.max_worker_slots) {
+      return sendError(res, 400, 'WORKER_LIMIT', `Đã đạt giới hạn ${owner.max_worker_slots} worker slots`);
+    }
     const worker = { id: uuid(), owner_id: owner.id, email, password_hash: hashPw(password), name: name || '', active: true, hwid: null, created_at: new Date().toISOString() };
     workersDb.push(worker); saveWorkers();
     auditDb.push({ id: uuid(), owner_id: owner.id, user_id: owner.id, user_type: 'owner', user_name: owner.email, action: 'CREATE_WORKER', target: email, timestamp: Date.now() }); saveAudit();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ worker_id: worker.id, email: worker.email, name: worker.name }));
   }
 
   if (req.method === 'PUT' && pathname.startsWith('/v1/team/workers/')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const workerId = pathname.split('/').pop();
     const worker = workersDb.find(w => w.id === workerId && w.owner_id === owner.id);
-    if (!worker) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy worker' })); }
-    const body = await parseJson(req);
+    if (!worker) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy worker');
     if (body.name !== undefined) worker.name = body.name;
     if (body.password) worker.password_hash = hashPw(body.password);
     if (body.active !== undefined) worker.active = body.active;
     saveWorkers();
     auditDb.push({ id: uuid(), owner_id: owner.id, user_id: owner.id, user_type: 'owner', user_name: owner.email, action: 'UPDATE_WORKER', target: worker.email, timestamp: Date.now() }); saveAudit();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   if (req.method === 'DELETE' && pathname.startsWith('/v1/team/workers/')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const workerId = pathname.split('/').pop();
     const idx = workersDb.findIndex(w => w.id === workerId && w.owner_id === owner.id);
-    if (idx === -1) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy worker' })); }
+    if (idx === -1) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy worker');
     const removed = workersDb.splice(idx, 1)[0]; saveWorkers();
     auditDb.push({ id: uuid(), owner_id: owner.id, user_id: owner.id, user_type: 'owner', user_name: owner.email, action: 'DELETE_WORKER', target: removed.email, timestamp: Date.now() }); saveAudit();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   if (req.method === 'GET' && pathname === '/v1/team/audit') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const logs = auditDb.filter(a => a.owner_id === owner.id).sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ audit: logs }));
   }
 
   // --- Profile Cloud Storage ---
   if (req.method === 'POST' && pathname === '/v1/profiles/cloud/sync') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
-    const body = await parseJson(req);
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const { profile_id, name, folder, config, assigned_worker_ids } = body;
-    if (!profile_id || !name) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Thiếu profile_id hoặc name' })); }
+    if (!profile_id || !name) return sendError(res, 400, 'VALIDATION_ERROR', 'Thiếu profile_id hoặc name');
     const existing = profilesDb.find(p => p.id === profile_id && p.owner_id === owner.id);
     if (existing) {
       existing.name = name;
@@ -316,13 +460,15 @@ const server = http.createServer(async (req, res) => {
       profilesDb.push({ id: profile_id, owner_id: owner.id, name, folder: folder || '', config: config || {}, assigned_worker_ids: assigned_worker_ids || [], cookies: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     }
     saveProfiles();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   if (req.method === 'GET' && pathname === '/v1/profiles/cloud') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    const payload = authRes.payload;
     let list;
     if (payload.type === 'owner') {
       list = profilesDb.filter(p => p.owner_id === payload.sub);
@@ -330,93 +476,103 @@ const server = http.createServer(async (req, res) => {
       list = profilesDb.filter(p => p.assigned_worker_ids && p.assigned_worker_ids.includes(payload.sub));
     }
     list = list.map(p => ({ id: p.id, name: p.name, folder: p.folder, assigned_worker_ids: p.assigned_worker_ids, has_cookies: !!p.cookies, created_at: p.created_at, updated_at: p.updated_at }));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ profiles: list }));
   }
 
   if (req.method === 'GET' && pathname.startsWith('/v1/profiles/cloud/') && pathname.endsWith('/config')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    const payload = authRes.payload;
     const parts = pathname.split('/');
     const profileId = parts[4];
     const profile = profilesDb.find(p => p.id === profileId);
-    if (!profile) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
-    if (payload.type === 'owner' && profile.owner_id !== payload.sub) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Không phải profile của bạn' })); }
-    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Bạn chưa được gán profile này' })); }
+    if (!profile) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
+    if (payload.type === 'owner' && profile.owner_id !== payload.sub) return sendError(res, 403, 'FORBIDDEN', 'Không phải profile thuộc quyền sở hữu của bạn');
+    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) return sendError(res, 403, 'FORBIDDEN', 'Bạn chưa được gán quyền truy cập profile này');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ id: profile.id, name: profile.name, folder: profile.folder, config: profile.config, assigned_worker_ids: profile.assigned_worker_ids }));
   }
 
   if (req.method === 'DELETE' && pathname.startsWith('/v1/profiles/cloud/') && !pathname.includes('/config') && !pathname.includes('/cookies') && !pathname.includes('/assign')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const profileId = pathname.split('/').pop();
     const idx = profilesDb.findIndex(p => p.id === profileId && p.owner_id === owner.id);
-    if (idx === -1) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
+    if (idx === -1) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
     profilesDb.splice(idx, 1); saveProfiles();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   if (req.method === 'PUT' && pathname.startsWith('/v1/profiles/cloud/') && pathname.endsWith('/assign')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const parts = pathname.split('/');
     const profileId = parts[4];
     const profile = profilesDb.find(p => p.id === profileId && p.owner_id === owner.id);
-    if (!profile) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
-    const body = await parseJson(req);
+    if (!profile) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
     profile.assigned_worker_ids = body.worker_ids || [];
     profile.updated_at = new Date().toISOString();
     saveProfiles();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   // --- Cookie Cloud Sync ---
   if (req.method === 'POST' && pathname.startsWith('/v1/profiles/cloud/') && pathname.endsWith('/cookies')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    const payload = authRes.payload;
     const parts = pathname.split('/');
     const profileId = parts[4];
     const profile = profilesDb.find(p => p.id === profileId);
-    if (!profile) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
-    if (payload.type === 'owner' && profile.owner_id !== payload.sub) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Không phải profile của bạn' })); }
-    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Bạn chưa được gán profile này' })); }
-    const body = await parseJson(req);
+    if (!profile) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
+    if (payload.type === 'owner' && profile.owner_id !== payload.sub) return sendError(res, 403, 'FORBIDDEN', 'Không phải profile của bạn');
+    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) return sendError(res, 403, 'FORBIDDEN', 'Bạn chưa được gán profile này');
     profile.cookies = body.cookies || [];
     profile.updated_at = new Date().toISOString();
     saveProfiles();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true, count: profile.cookies.length }));
   }
 
   if (req.method === 'GET' && pathname.startsWith('/v1/profiles/cloud/') && pathname.endsWith('/cookies')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const payload = authMw(req);
-    if (!payload) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Token không hợp lệ' })); }
+    const authRes = authMw(req);
+    if (!authRes || !authRes.valid) return sendError(res, 401, authRes?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID', 'Token không hợp lệ hoặc đã hết hạn');
+    const payload = authRes.payload;
     const parts = pathname.split('/');
     const profileId = parts[4];
     const profile = profilesDb.find(p => p.id === profileId);
-    if (!profile) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
-    if (payload.type === 'owner' && profile.owner_id !== payload.sub) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Không phải profile của bạn' })); }
-    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Bạn chưa được gán profile này' })); }
+    if (!profile) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
+    if (payload.type === 'owner' && profile.owner_id !== payload.sub) return sendError(res, 403, 'FORBIDDEN', 'Không phải profile của bạn');
+    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) return sendError(res, 403, 'FORBIDDEN', 'Bạn chưa được gán profile này');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ cookies: profile.cookies || [] }));
   }
 
   if (req.method === 'DELETE' && pathname.startsWith('/v1/profiles/cloud/') && pathname.endsWith('/cookies')) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     const owner = requireOwner(authMw(req));
-    if (!owner) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chỉ owner mới có quyền' })); }
+    if (!owner) return sendError(res, 403, 'FORBIDDEN', 'Chỉ owner mới có quyền thực hiện thao tác này');
     const parts = pathname.split('/');
     const profileId = parts[4];
     const profile = profilesDb.find(p => p.id === profileId && p.owner_id === owner.id);
-    if (!profile) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Không tìm thấy profile' })); }
+    if (!profile) return sendError(res, 404, 'NOT_FOUND', 'Không tìm thấy profile');
     profile.cookies = null;
     profile.updated_at = new Date().toISOString();
     saveProfiles();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
+  // --- License & App Endpoints ---
   if (pathname === '/v1/app/update') {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
@@ -428,8 +584,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'POST' && pathname === '/v1/license/activate') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const body = await parseJson(req);
     const queryKey = reqUrl.searchParams ? (reqUrl.searchParams.get('license_key') || reqUrl.searchParams.get('key')) : null;
     const queryHwid = reqUrl.searchParams ? reqUrl.searchParams.get('hwid') : null;
     const queryDevice = reqUrl.searchParams ? reqUrl.searchParams.get('device_name') : null;
@@ -438,115 +592,114 @@ const server = http.createServer(async (req, res) => {
     const hwid = body.hwid || queryHwid;
     const device_name = body.device_name || queryDevice;
 
-    if (!license_key || !hwid) { res.writeHead(400); return res.end(JSON.stringify({ error: 'Thiếu thông tin license_key hoặc hwid' })); }
+    if (!license_key || !hwid) return sendError(res, 400, 'VALIDATION_ERROR', 'Thiếu thông tin license_key hoặc hwid');
 
     const lic = licensesMap.get(license_key);
-    if (!lic) { res.writeHead(404); return res.end(JSON.stringify({ error: 'License Key không hợp lệ' })); }
-    if (lic.expires_at && new Date(lic.expires_at) < new Date()) { res.writeHead(403); return res.end(JSON.stringify({ error: 'License Key đã hết hạn' })); }
-    if (!lic.active_hwids.has(hwid) && lic.active_hwids.size >= lic.max_devices) { res.writeHead(403); return res.end(JSON.stringify({ error: 'License đã đạt giới hạn thiết bị cho phép' })); }
+    if (!lic) return sendError(res, 404, 'LICENSE_INVALID', 'License Key không hợp lệ');
+    if (lic.expires_at && new Date(lic.expires_at) < new Date()) return sendError(res, 400, 'LICENSE_EXPIRED', 'License Key đã hết hạn');
+    if (!lic.active_hwids.has(hwid) && lic.active_hwids.size >= lic.max_devices) {
+      return sendError(res, 400, 'LICENSE_LIMIT', 'License đã đạt giới hạn thiết bị cho phép');
+    }
 
     lic.active_hwids.set(hwid, { device_name: device_name || 'Desktop PC', activated_at: new Date().toISOString() });
-    saveDb();
+    saveLicensesDb();
 
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ key: lic.key, hwid, status: 'active', expires_at: lic.expires_at, max_devices: lic.max_devices, active_devices: lic.active_hwids.size }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/license/verify') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const body = await parseJson(req);
     const queryKey = reqUrl.searchParams ? (reqUrl.searchParams.get('license_key') || reqUrl.searchParams.get('key')) : null;
     const queryHwid = reqUrl.searchParams ? reqUrl.searchParams.get('hwid') : null;
     const license_key = body.license_key || body.key || queryKey;
     const hwid = body.hwid || queryHwid;
 
     const lic = licensesMap.get(license_key);
-    if (!lic) { res.writeHead(404); return res.end(JSON.stringify({ error: 'License Key không tồn tại' })); }
-    if (lic.expires_at && new Date(lic.expires_at) < new Date()) { res.writeHead(403); return res.end(JSON.stringify({ error: 'License Key đã hết hạn' })); }
-    if (!lic.active_hwids.has(hwid)) { res.writeHead(403); return res.end(JSON.stringify({ error: 'Thiết bị chưa được kích hoạt cho License này' })); }
+    if (!lic) return sendError(res, 404, 'LICENSE_INVALID', 'License Key không tồn tại');
+    if (lic.expires_at && new Date(lic.expires_at) < new Date()) return sendError(res, 400, 'LICENSE_EXPIRED', 'License Key đã hết hạn');
+    if (!lic.active_hwids.has(hwid)) return sendError(res, 400, 'LICENSE_INVALID', 'Thiết bị chưa được kích hoạt cho License này');
 
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ key: lic.key, hwid, status: 'active', expires_at: lic.expires_at, max_devices: lic.max_devices, active_devices: lic.active_hwids.size }));
   }
 
+  // --- Admin API Endpoints ---
   if (req.method === 'POST' && pathname === '/v1/admin/login') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    const body = await parseJson(req);
     if (body.password === ADMIN_PASSWORD) {
-      res.setHeader('Set-Cookie', 'clogin_admin_session=authenticated_2026_clogin_secret; Path=/; HttpOnly; Max-Age=86400');
+      res.setHeader('Set-Cookie', `clogin_admin_session=${ADMIN_COOKIE_SECRET}; Path=/; HttpOnly; Max-Age=86400`);
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.writeHead(200);
       return res.end(JSON.stringify({ success: true }));
     }
-    res.writeHead(401);
-    return res.end(JSON.stringify({ error: 'Mật khẩu quản trị không chính xác' }));
+    return sendError(res, 401, 'INVALID_CREDENTIALS', 'Mật khẩu quản trị không chính xác');
   }
 
   if (req.method === 'POST' && pathname === '/v1/admin/logout') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Set-Cookie', 'clogin_admin_session=; Path=/; HttpOnly; Max-Age=0');
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ success: true }));
   }
 
   if (req.method === 'GET' && pathname === '/v1/admin/licenses') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập quản trị' })); }
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const list = Array.from(licensesMap.values()).map((l) => ({
       key: l.key, plan: l.plan, max_devices: l.max_devices, active_devices: l.active_hwids.size, expires_at: l.expires_at,
       devices: Array.from(l.active_hwids.entries()).map(([hwid, dev]) => ({ hwid, device_name: dev.device_name, activated_at: dev.activated_at })),
     }));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ licenses: list }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/admin/licenses') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập quản trị' })); }
-    const body = await parseJson(req);
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const { plan, max_devices, days_valid } = body;
     const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
     const key = `CLOGIN-${(plan || 'STD').replaceAll(/\s+/g, '').toUpperCase()}-${randomStr}`;
     const expires_at = days_valid ? new Date(Date.now() + days_valid * 24 * 60 * 60 * 1000).toISOString() : null;
     const newLic = { key, plan: plan || 'Standard', max_devices: max_devices || 1, expires_at, active_hwids: new Map() };
     licensesMap.set(key, newLic);
-    saveDb();
+    saveLicensesDb();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.writeHead(200);
     return res.end(JSON.stringify({ key, plan: newLic.plan, max_devices: newLic.max_devices, expires_at }));
   }
 
   if (req.method === 'POST' && pathname === '/v1/admin/licenses/action') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập quản trị' })); }
-    const body = await parseJson(req);
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const { action, key, hwid } = body;
     const lic = licensesMap.get(key);
-    if (!lic) { res.writeHead(404); return res.end(JSON.stringify({ error: 'Key không tồn tại' })); }
-    if (action === 'delete') { licensesMap.delete(key); saveDb(); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã xóa Key' })); }
-    if (action === 'reset_hwid' && hwid) { lic.active_hwids.delete(hwid); saveDb(); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã giải phóng thiết bị khỏi Key' })); }
-    if (action === 'reset_all_hwids') { lic.active_hwids.clear(); saveDb(); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã reset toàn bộ thiết bị của Key' })); }
-    res.writeHead(400);
-    return res.end(JSON.stringify({ error: 'Hành động không hợp lệ' }));
+    if (!lic) return sendError(res, 404, 'NOT_FOUND', 'Key không tồn tại');
+    if (action === 'delete') { licensesMap.delete(key); saveLicensesDb(); res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã xóa Key' })); }
+    if (action === 'reset_hwid' && hwid) { lic.active_hwids.delete(hwid); saveLicensesDb(); res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã giải phóng thiết bị khỏi Key' })); }
+    if (action === 'reset_all_hwids') { lic.active_hwids.clear(); saveLicensesDb(); res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.writeHead(200); return res.end(JSON.stringify({ success: true, message: 'Đã reset toàn bộ thiết bị của Key' })); }
+    return sendError(res, 400, 'VALIDATION_ERROR', 'Hành động không hợp lệ');
   }
 
-  // --- Admin API Endpoints (cookie auth) ---
   if (req.method === 'GET' && pathname === '/v1/admin/owners') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập' })); }
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const list = ownersDb.map(o => ({ id: o.id, email: o.email, license_key: o.license_key, max_worker_slots: o.max_worker_slots, worker_count: workersDb.filter(w => w.owner_id === o.id).length, created_at: o.created_at }));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ owners: list }));
   }
 
   if (req.method === 'GET' && pathname === '/v1/admin/profiles') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập' })); }
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const list = profilesDb.map(p => ({ id: p.id, owner_id: p.owner_id, name: p.name, has_cookies: !!p.cookies, assigned_count: (p.assigned_worker_ids || []).length, updated_at: p.updated_at }));
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ profiles: list }));
   }
 
   if (req.method === 'GET' && pathname === '/v1/admin/audit') {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    if (!isAdminAuthed(req)) { res.writeHead(401); return res.end(JSON.stringify({ error: 'Chưa đăng nhập' })); }
+    if (!isAdminAuthed(req)) return sendError(res, 401, 'FORBIDDEN', 'Chưa đăng nhập quản trị');
     const logs = auditDb.sort((a, b) => b.timestamp - a.timestamp).slice(0, 200);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.writeHead(200);
     return res.end(JSON.stringify({ audit: logs }));
   }
 
