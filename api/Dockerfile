@@ -1,9 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY api/package*.json ./
+COPY package*.json ./
 RUN npm ci --production
-COPY api/prisma ./prisma
+COPY prisma ./prisma
 RUN npx prisma generate
-COPY api/src ./src
+COPY src ./src
 EXPOSE 3000
 CMD ["node", "src/index.js"]

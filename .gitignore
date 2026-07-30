@@ -1,3 +1,12 @@
 node_modules/
 *_db.json
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.next/
+dist/
+build/
+*.log
+.DS_Store

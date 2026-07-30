@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AdminUser {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password_hash  String
+  name           String    @default("")
+  role           AdminRole @default(viewer)
+  active         Boolean   @default(true)
+  last_login_at  DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  @@map("admin_users")
+}
+
+enum AdminRole {
+  super_admin
+  support
+  viewer
+}
+
+model LicensePlan {
+  id             String    @id @default(uuid())
+  name           String
+  slug           String    @unique
+  max_devices    Int       @default(1)
+  max_workers    Int       @default(3)
+  max_profiles   Int       @default(100)
+  features       Json      @default("[]")
+  price_vnd      Int       @default(0)
+  duration_days  Int?
+  active         Boolean   @default(true)
+  sort_order     Int       @default(0)
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  licenses       License[]
+  @@map("license_plans")
+}
+
+model License {
+  id             String        @id @default(uuid())
+  key            String        @unique
+  plan_id        String?
+  plan           LicensePlan?  @relation(fields: [plan_id], references: [id])
+  plan_name      String        @default("Standard")
+  max_devices    Int           @default(1)
+  status         LicenseStatus @default(active)
+  expires_at     DateTime?
+  suspended_at   DateTime?
+  suspend_reason String?
+  notes          String        @default("")
+  coupon_code    String?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+  devices        Device[]
+  owner          Owner?
+  @@index([status])
+  @@index([expires_at])
+  @@map("licenses")
+}
+
+enum LicenseStatus {
+  active
+  expired
+  suspended
+  revoked
+}
+
+model Device {
+  id             String   @id @default(uuid())
+  license_id     String
+  license        License  @relation(fields: [license_id], references: [id], onDelete: Cascade)
+  hwid           String
+  device_name    String   @default("Desktop PC")
+  ip_address     String?
+  last_seen_at   DateTime @default(now())
+  activated_at   DateTime @default(now())
+  @@unique([license_id, hwid])
+  @@map("devices")
+}
+
+model Owner {
+  id               String         @id @default(uuid())
+  email            String         @unique
+  password_hash    String
+  name             String         @default("")
+  license_id       String?        @unique
+  license          License?       @relation(fields: [license_id], references: [id])
+  max_worker_slots Int            @default(3)
+  active           Boolean        @default(true)
+  last_login_at    DateTime?
+  last_login_ip    String?
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
+  workers          Worker[]
+  profiles         CloudProfile[]
+  audit_logs       AuditLog[]
+  @@index([email])
+  @@map("owners")
+}
+
+model Worker {
+  id             String    @id @default(uuid())
+  owner_id       String
+  owner          Owner     @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  email          String
+  password_hash  String
+  name           String    @default("")
+  active         Boolean   @default(true)
+  last_login_at  DateTime?
+  last_login_ip  String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  @@unique([owner_id, email])
+  @@index([email])
+  @@map("workers")
+}
+
+model CloudProfile {
+  id                  String    @id
+  owner_id            String
+  owner               Owner     @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  name                String
+  folder              String    @default("")
+  config              Json      @default("{}")
+  cookies             Json?
+  assigned_worker_ids String[]  @default([])
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  @@index([owner_id])
+  @@map("cloud_profiles")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  owner_id    String?
+  owner       Owner?    @relation(fields: [owner_id], references: [id], onDelete: SetNull)
+  user_id     String
+  user_type   String
+  user_name   String
+  action      String
+  target      String    @default("")
+  ip_address  String?
+  user_agent  String?
+  metadata    Json?
+  timestamp   DateTime  @default(now())
+  @@index([owner_id])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+model LoginHistory {
+  id          String   @id @default(uuid())
+  user_id     String
+  user_type   String
+  email       String
+  ip_address  String
+  user_agent  String?
+  country     String?
+  success     Boolean  @default(true)
+  fail_reason String?
+  created_at  DateTime @default(now())
+  @@index([user_id])
+  @@index([email])
+  @@index([created_at])
+  @@map("login_history")
+}
+
+model Release {
+  id            String         @id @default(uuid())
+  version       String         @unique
+  channel       ReleaseChannel @default(stable)
+  changelog     String         @default("")
+  download_url  String?
+  min_version   String?
+  is_current    Boolean        @default(false)
+  published_at  DateTime       @default(now())
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  @@index([channel, is_current])
+  @@map("releases")
+}
+
+enum ReleaseChannel {
+  stable
+  beta
+  canary
+}
+
+model Announcement {
+  id           String    @id @default(uuid())
+  title        String
+  body         String
+  type         String    @default("info")
+  target       String    @default("all")
+  active       Boolean   @default(true)
+  starts_at    DateTime  @default(now())
+  ends_at      DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  @@map("announcements")
+}
+
+model SystemConfig {
+  key        String   @id
+  value      Json
+  updated_at DateTime @updatedAt
+  @@map("system_config")
+}
+
+model FeatureFlag {
+  id           String   @id @default(uuid())
+  key          String   @unique
+  name         String
+  description  String   @default("")
+  enabled      Boolean  @default(true)
+  target_plans String[] @default([])
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  @@map("feature_flags")
+}
+
+model Coupon {
+  id               String    @id @default(uuid())
+  code             String    @unique
+  discount_percent Int       @default(0)
+  plan_id          String?
+  max_uses         Int       @default(1)
+  used_count       Int       @default(0)
+  active           Boolean   @default(true)
+  expires_at       DateTime?
+  created_at       DateTime  @default(now())
+  @@map("coupons")
+}
+
+model IpBlock {
+  id         String    @id @default(uuid())
+  ip         String    @unique
+  reason     String    @default("")
+  expires_at DateTime?
+  created_at DateTime  @default(now())
+  @@map("ip_blocks")
+}
