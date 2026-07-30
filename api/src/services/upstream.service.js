@@ -158,8 +158,46 @@ class UpstreamService {
     const headers = await this.getHeaders(config);
 
     const upstreamOwner = config.upstream_repo.split('/')[0];
+    let debugInfo = [];
 
-    // Attempt 1: Sync Fork directly via GitHub Merge Upstream API
+    // Method 1: Look up existing workflows and trigger `sync-upstream.yml` or similar
+    try {
+      const listWfUrl = `https://api.github.com/repos/${config.origin_repo}/actions/workflows`;
+      const listRes = await fetch(listWfUrl, { headers });
+      if (listRes.ok) {
+        const wfData = await listRes.json();
+        const syncWf = (wfData.workflows || []).find(w =>
+          w.path.includes('sync') || w.name.toLowerCase().includes('sync')
+        );
+
+        const wfId = syncWf ? syncWf.id : 'sync-upstream.yml';
+        const workflowUrl = `https://api.github.com/repos/${config.origin_repo}/actions/workflows/${wfId}/dispatches`;
+
+        const wfRes = await fetch(workflowUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ ref: config.target_branch })
+        });
+
+        if (wfRes.status === 204) {
+          return {
+            success: true,
+            message: `Đã kích hoạt GitHub Action (${syncWf ? syncWf.name : 'Sync Upstream'}) tự động gộp code từ ${config.upstream_repo}!`,
+            via_workflow: true
+          };
+        } else {
+          const wfErr = await wfRes.json().catch(() => ({}));
+          debugInfo.push(`Workflow dispatch status ${wfRes.status}: ${wfErr.message || 'Workflow error'}`);
+        }
+      } else {
+        const listErr = await listRes.json().catch(() => ({}));
+        debugInfo.push(`List workflows status ${listRes.status}: ${listErr.message || 'Cannot list workflows'}`);
+      }
+    } catch (err) {
+      debugInfo.push(`Workflow dispatch failed: ${err.message}`);
+    }
+
+    // Method 2: Sync Fork directly via GitHub Merge Upstream API (Works if GitHub Fork)
     try {
       const mergeUpstreamUrl = `https://api.github.com/repos/${config.origin_repo}/merge-upstream`;
       const mergeRes = await fetch(mergeUpstreamUrl, {
@@ -185,11 +223,13 @@ class UpstreamService {
           message: 'Xung đột code (Merge Conflict) trên GitHub. Cần mở GitHub để resolve conflict thủ công.'
         };
       }
+      debugInfo.push(`Merge upstream status ${mergeRes.status}: ${mergeData.message || 'Not a fork'}`);
     } catch (err) {
       if (err.statusCode) throw err;
+      debugInfo.push(`Merge upstream failed: ${err.message}`);
     }
 
-    // Attempt 2: Create a Pull Request from Upstream owner:branch
+    // Method 3: Create a Pull Request from Upstream owner:branch
     const url = `https://api.github.com/repos/${config.origin_repo}/pulls`;
     const body = {
       title: `sync: pull updates from upstream ${config.upstream_repo}`,
@@ -211,14 +251,12 @@ class UpstreamService {
       if (res.status === 409 || errorMsg.includes('already exists')) {
         throw { statusCode: 409, code: 'PR_EXISTS', message: 'Đã có Pull Request đồng bộ đang mở trên GitHub.' };
       }
-      if (res.status === 422) {
-        throw {
-          statusCode: 400,
-          code: 'VALIDATION_ERROR',
-          message: `Không thể tạo PR tự động: ${errorMsg || 'Repository không được tạo dưới dạng Fork chính thức trên GitHub hoặc đã đồng bộ đầy đủ.'}`
-        };
-      }
-      throw { statusCode: res.status, code: 'GITHUB_API_ERROR', message: errorMsg || 'Không thể tạo Pull Request trên GitHub' };
+
+      throw {
+        statusCode: 400,
+        code: 'SYNC_FAILED',
+        message: `Không thể kích hoạt tự động. Lý do GitHub API: ${errorMsg || debugInfo.join(' | ') || 'Cần kiểm tra Token hoặc Workflow trên GitHub'}`
+      };
     }
 
     return {
