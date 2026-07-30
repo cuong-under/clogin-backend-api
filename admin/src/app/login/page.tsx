@@ -6,7 +6,7 @@ import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { loginAdmin } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { ShardLogo } from '@/components/ui/ShardLogo';
+import { CloginLogo } from '@/components/ui/CloginLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,7 +46,7 @@ export default function LoginPage() {
         {/* Logo & Header */}
         <div className="text-center mb-8 flex flex-col items-center gap-3">
           <div className="flex items-center gap-3">
-            <ShardLogo size={42} />
+            <CloginLogo size={42} />
             <span className="text-3xl font-extrabold tracking-wider brand-gradient-text">
               CLOGIN STUDIO
             </span>

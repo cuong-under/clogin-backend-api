@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function ShardLogo({ size = 28 }: { size?: number }) {
+export function CloginLogo({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none" className="clogin-logo-svg">
       <defs>

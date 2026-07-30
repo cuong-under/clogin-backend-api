@@ -16,7 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ShardLogo } from '../ui/ShardLogo';
+import { CloginLogo } from '../ui/CloginLogo';
 
 interface NavItem {
   label: string;
@@ -114,7 +114,7 @@ export const Sidebar: React.FC = () => {
     <aside className="w-64 bg-[#0a202a] border-r border-[#194354] flex flex-col h-screen sticky top-0 shrink-0 select-none">
       {/* Brand Header */}
       <div className="h-16 flex items-center gap-3 px-5 border-b border-[#194354] bg-[#07151c]">
-        <ShardLogo size={30} />
+        <CloginLogo size={30} />
         <div>
           <div className="flex items-center gap-1.5">
             <span className="font-extrabold text-base tracking-wider brand-gradient-text">CLOGIN</span>
