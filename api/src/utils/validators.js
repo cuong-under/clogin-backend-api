@@ -17,9 +17,10 @@ function getClientIp(req) {
 
 function parsePagination(query) {
   const page = Math.max(1, parseInt(query.page) || 1);
-  const perPage = Math.min(100, Math.max(1, parseInt(query.per_page) || 20));
+  const limitVal = parseInt(query.limit) || parseInt(query.per_page) || parseInt(query.perPage) || 20;
+  const perPage = Math.min(100, Math.max(1, limitVal));
   const skip = (page - 1) * perPage;
-  return { page, perPage, skip };
+  return { page, perPage, limit: perPage, per_page: perPage, skip };
 }
 
 function isValidEmail(email) {

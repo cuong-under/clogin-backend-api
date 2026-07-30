@@ -773,4 +773,315 @@ router.delete('/admin-users/:id', requireRole(['super_admin']), async (req, res,
   }
 });
 
+// ==================== ALIAS ROUTES FOR FRONTEND COMPATIBILITY ====================
+
+// Bulk license operations
+router.post('/licenses/bulk-delete', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (Array.isArray(ids)) {
+      await Promise.all(ids.map(id => licenseService.deleteLicense(id).catch(() => {})));
+    }
+    return res.status(200).json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/licenses/bulk-suspend', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const { ids, reason } = req.body;
+    if (Array.isArray(ids)) {
+      await Promise.all(ids.map(id => licenseService.suspendLicense(id, reason).catch(() => {})));
+    }
+    return res.status(200).json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Users - Owners
+router.get('/users/owners', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const { page, perPage } = parsePagination(req.query);
+    const result = await userService.listOwners({ search: req.query.search, page, perPage });
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.get('/users/owners/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const owner = await userService.getOwnerById(req.params.id);
+    return res.status(200).json({ data: owner, owner });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/users/owners/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const owner = await userService.updateOwner(req.params.id, req.body);
+    return res.status(200).json({ data: owner, owner });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/users/owners/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const result = await userService.deleteOwner(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.post('/users/owners/:id/reset-password', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const newPassword = req.body.password || req.body.new_password || ('Clogin' + Math.floor(100000 + Math.random() * 900000));
+    const result = await userService.resetOwnerPassword(req.params.id, newPassword);
+    return res.status(200).json({ ...result, new_password: newPassword });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.post('/users/owners/:id/toggle-status', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const owner = await userService.getOwnerById(req.params.id);
+    const updated = await userService.updateOwner(req.params.id, { active: !owner.active });
+    return res.status(200).json({ data: updated, owner: updated });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.get('/users/owners/:id/workers', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const workers = await userService.getWorkers(req.params.id);
+    return res.status(200).json({ data: workers.workers || [], workers: workers.workers || [] });
+  } catch (err) { next(err); }
+});
+
+router.get('/users/owners/:id/profiles', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const result = await profileService.listProfilesAdmin({ owner_id: req.params.id, page: 1, perPage: 100 });
+    return res.status(200).json({ data: result.profiles || [], profiles: result.profiles || [] });
+  } catch (err) { next(err); }
+});
+
+router.get('/users/owners/:id/logins', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const owner = await userService.getOwnerById(req.params.id);
+    const result = await auditService.listLoginHistory({ email: owner.email, page: 1, perPage: 100 });
+    return res.status(200).json({ data: result.login_history || [], logins: result.login_history || [] });
+  } catch (err) { next(err); }
+});
+
+// Users - Workers
+router.get('/users/workers', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const { page, perPage } = parsePagination(req.query);
+    const result = await userService.listWorkersAdmin({ search: req.query.search, owner_id: req.query.owner_id, page, perPage });
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.get('/users/workers/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const worker = await userService.getWorkerById(req.params.id);
+    return res.status(200).json({ data: worker, worker });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/users/workers/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const worker = await userService.updateWorkerAdmin(req.params.id, req.body);
+    return res.status(200).json({ data: worker, worker });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/users/workers/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const result = await userService.deleteWorkerAdmin(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.post('/users/workers/:id/toggle-status', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const worker = await userService.getWorkerById(req.params.id);
+    const updated = await userService.updateWorkerAdmin(req.params.id, { active: !worker.active });
+    return res.status(200).json({ data: updated, worker: updated });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// Settings - Admin Users
+router.get('/settings/admins', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await systemService.listAdminUsers();
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/settings/admins', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const user = await systemService.createAdminUser(req.body);
+    return res.status(200).json({ data: user, ...user });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/settings/admins/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const user = await systemService.updateAdminUser(req.params.id, req.body);
+    return res.status(200).json({ data: user, ...user });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/settings/admins/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await systemService.deleteAdminUser(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// Settings - Feature Flags
+router.get('/settings/feature-flags', requireRole(['super_admin', 'viewer']), async (req, res, next) => {
+  try {
+    const result = await systemService.listFeatureFlags();
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/settings/feature-flags', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const flag = await systemService.createFeatureFlag(req.body);
+    return res.status(200).json({ data: flag, ...flag });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/settings/feature-flags/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const flag = await systemService.updateFeatureFlag(req.params.id, req.body);
+    return res.status(200).json({ data: flag, ...flag });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/settings/feature-flags/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await systemService.deleteFeatureFlag(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// Settings - Config
+router.get('/settings/config', requireRole(['super_admin', 'viewer']), async (req, res, next) => {
+  try {
+    const config = await systemService.getConfig();
+    return res.status(200).json({ data: config, config });
+  } catch (err) { next(err); }
+});
+
+router.put('/settings/config', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const config = await systemService.updateConfig(req.body);
+    return res.status(200).json({ data: config, config });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// Licenses - Plans & Coupons
+router.get('/licenses/plans', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const plans = await systemService.listPlans();
+    return res.status(200).json(plans);
+  } catch (err) { next(err); }
+});
+
+router.post('/licenses/plans', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const plan = await systemService.createPlan(req.body);
+    return res.status(200).json({ data: plan, ...plan });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/licenses/plans/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const plan = await systemService.updatePlan(req.params.id, req.body);
+    return res.status(200).json({ data: plan, ...plan });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/licenses/plans/:id', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await systemService.deletePlan(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.get('/licenses/coupons', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const coupons = await systemService.listCoupons();
+    return res.status(200).json(coupons);
+  } catch (err) { next(err); }
+});
+
+router.post('/licenses/coupons', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const coupon = await systemService.createCoupon(req.body);
+    return res.status(200).json({ data: coupon, ...coupon });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/licenses/coupons/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const coupon = await systemService.updateCoupon(req.params.id, req.body);
+    return res.status(200).json({ data: coupon, ...coupon });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/licenses/coupons/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const result = await systemService.deleteCoupon(req.params.id);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// Audit & Security aliases
+router.get('/audit/logs', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const { page, perPage } = parsePagination(req.query);
+    const result = await auditService.listAdminAuditLogs({
+      action: req.query.action,
+      user_type: req.query.user_type,
+      from: req.query.from,
+      to: req.query.to,
+      page,
+      perPage
+    });
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.get('/audit/logins', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const { page, perPage } = parsePagination(req.query);
+    const result = await auditService.listLoginHistory({
+      email: req.query.email,
+      success: req.query.success,
+      from: req.query.from,
+      to: req.query.to,
+      page,
+      perPage
+    });
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.get('/security/blocked-ips', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const result = await auditService.listIpBlocks();
+    return res.status(200).json(result);
+  } catch (err) { next(err); }
+});
+
+router.post('/security/blocked-ips', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const result = await auditService.addIpBlock(req.body);
+    return res.status(200).json({ data: result, ...result });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.delete('/security/blocked-ips/:ip', requireRole(['super_admin', 'support']), async (req, res, next) => {
+  try {
+    const result = await auditService.removeIpBlock(req.params.ip);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
 module.exports = router;

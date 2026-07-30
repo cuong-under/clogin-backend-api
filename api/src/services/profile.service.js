@@ -237,7 +237,7 @@ class ProfileService {
       updated_at: p.updated_at.toISOString()
     }));
 
-    return { profiles: formatted, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: formatted, profiles: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getProfileByIdAdmin(id) {

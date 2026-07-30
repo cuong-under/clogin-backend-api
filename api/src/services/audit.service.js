@@ -81,7 +81,7 @@ class AuditService {
       created_at: l.timestamp.toISOString()
     }));
 
-    return { audit: formatted, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: formatted, audit: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async listLoginHistory({ email, success, from, to, page = 1, perPage = 50 }) {
@@ -108,7 +108,7 @@ class AuditService {
       prisma.loginHistory.count({ where })
     ]);
 
-    return { login_history: history, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: history, login_history: history, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getSuspiciousLogins() {
@@ -125,19 +125,18 @@ class AuditService {
       }
     });
 
-    return {
-      suspicious_ips: failedLogins.map(f => ({
-        ip_address: f.ip_address,
-        failed_count: f._count.id
-      }))
-    };
+    const formatted = failedLogins.map(f => ({
+      ip_address: f.ip_address,
+      failed_count: f._count.id
+    }));
+    return { data: formatted, suspicious_ips: formatted };
   }
 
   async listIpBlocks() {
     const blocks = await prisma.ipBlock.findMany({
       orderBy: { created_at: 'desc' }
     });
-    return { ip_blocks: blocks };
+    return { data: blocks, ip_blocks: blocks };
   }
 
   async addIpBlock({ ip, reason = '', expires_at }) {

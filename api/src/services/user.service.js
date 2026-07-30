@@ -295,7 +295,7 @@ class UserService {
       workers: o.workers
     }));
 
-    return { owners: formatted, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: formatted, owners: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getOwnerById(id) {
@@ -361,7 +361,7 @@ class UserService {
       prisma.worker.count({ where })
     ]);
 
-    return { workers, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: workers, workers, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getWorkerById(id) {

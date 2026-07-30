@@ -164,7 +164,7 @@ class LicenseService {
       }))
     }));
 
-    return { licenses: formatted, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) };
+    return { data: formatted, licenses: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getLicenseById(id) {

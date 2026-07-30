@@ -40,7 +40,7 @@ class ReleaseService {
     const releases = await prisma.release.findMany({
       orderBy: { published_at: 'desc' }
     });
-    return { releases };
+    return { data: releases, releases };
   }
 
   async createRelease({ version, channel = 'stable', changelog = '', download_url, min_version, is_current = false }) {

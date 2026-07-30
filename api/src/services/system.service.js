@@ -5,9 +5,10 @@ const { hashPw } = require('../utils/hash');
 class SystemService {
   // --- License Plans ---
   async listPlans() {
-    return prisma.licensePlan.findMany({
+    const plans = await prisma.licensePlan.findMany({
       orderBy: { sort_order: 'asc' }
     });
+    return { data: plans, plans };
   }
 
   async createPlan(data) {
@@ -31,9 +32,10 @@ class SystemService {
 
   // --- Coupons ---
   async listCoupons() {
-    return prisma.coupon.findMany({
+    const coupons = await prisma.coupon.findMany({
       orderBy: { created_at: 'desc' }
     });
+    return { data: coupons, coupons };
   }
 
   async createCoupon(data) {
@@ -85,9 +87,10 @@ class SystemService {
   }
 
   async listAnnouncements() {
-    return prisma.announcement.findMany({
+    const announcements = await prisma.announcement.findMany({
       orderBy: { created_at: 'desc' }
     });
+    return { data: announcements, announcements };
   }
 
   async createAnnouncement(data) {
@@ -135,9 +138,10 @@ class SystemService {
   }
 
   async listFeatureFlags() {
-    return prisma.featureFlag.findMany({
+    const featureFlags = await prisma.featureFlag.findMany({
       orderBy: { created_at: 'desc' }
     });
+    return { data: featureFlags, feature_flags: featureFlags };
   }
 
   async createFeatureFlag(data) {
@@ -208,7 +212,7 @@ class SystemService {
       },
       orderBy: { created_at: 'desc' }
     });
-    return { admin_users: users };
+    return { data: users, admin_users: users };
   }
 
   async createAdminUser({ email, password, name = '', role = 'viewer' }) {
