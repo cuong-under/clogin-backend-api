@@ -1,5 +1,6 @@
 FROM node:20-alpine
 WORKDIR /app
+RUN apk add --no-cache openssl wget
 COPY api/package*.json ./
 RUN npm ci --production
 COPY api/prisma ./prisma

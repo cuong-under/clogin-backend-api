@@ -2,6 +2,19 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const { execSync } = require('child_process');
+
+// Auto DB push and seed on startup
+if (process.env.DATABASE_URL) {
+  try {
+    console.log('[Prisma] Syncing database schema...');
+    execSync('npx prisma db push --skip-generate', { stdio: 'inherit' });
+    console.log('[Migration] Running auto migration/seed...');
+    require('./migrate');
+  } catch (err) {
+    console.error('[DB Setup Error]', err.message);
+  }
+}
 
 const authRoutes = require('./routes/auth');
 const licenseRoutes = require('./routes/license');
