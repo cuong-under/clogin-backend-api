@@ -53,9 +53,7 @@ class UpstreamService {
     const headers = await this.getHeaders(config);
 
     try {
-      // Fetch compare status between origin and upstream
-      // GitHub API compare format: /repos/{owner}/{repo}/compare/{basehead}
-      // basehead: {base}...{head} where head can be owner:branch
+      // 1. Try official GitHub compare API (Works if GitHub Fork)
       const upstreamOwner = config.upstream_repo.split('/')[0];
       const compareUrl = `https://api.github.com/repos/${config.origin_repo}/compare/${config.target_branch}...${upstreamOwner}:${config.target_branch}`;
 
@@ -71,50 +69,86 @@ class UpstreamService {
         };
       }
 
-      if (!res.ok) {
-        // Fallback: Try fetching upstream commits directly
-        const commitsUrl = `https://api.github.com/repos/${config.upstream_repo}/commits?per_page=10`;
-        const commitsRes = await fetch(commitsUrl, { headers });
-        if (commitsRes.ok) {
-          const commits = await commitsRes.json();
-          return {
-            status: 'AVAILABLE',
-            behind_by: commits.length,
-            ahead_by: 0,
-            last_checked: new Date().toISOString(),
-            latest_upstream_commit: commits[0] ? {
-              sha: commits[0].sha.substring(0, 7),
-              message: commits[0].commit.message,
-              author: commits[0].commit.author.name,
-              date: commits[0].commit.author.date
-            } : null
-          };
-        }
+      if (res.ok) {
+        const data = await res.json();
         return {
-          status: 'ERROR',
-          behind_by: 0,
-          ahead_by: 0,
+          status: data.behind_by > 0 ? 'BEHIND' : 'UP_TO_DATE',
+          behind_by: data.behind_by || 0,
+          ahead_by: data.ahead_by || 0,
+          status_text: data.status,
           last_checked: new Date().toISOString(),
-          message: 'Không thể kết nối đến GitHub API'
+          total_commits: data.total_commits || 0,
+          commits: (data.commits || []).slice(0, 10).map(c => ({
+            sha: c.sha.substring(0, 7),
+            full_sha: c.sha,
+            message: c.commit.message,
+            author: c.commit.author?.name || c.author?.login || 'Unknown',
+            date: c.commit.author?.date,
+            html_url: c.html_url
+          }))
         };
       }
 
-      const data = await res.json();
+      // 2. Smart Fallback for Standalone/Non-Fork Repos:
+      // Fetch recent commits from both origin and upstream to accurately compute `behind_by`
+      const [originRes, upstreamRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${config.origin_repo}/commits?per_page=30`, { headers }).catch(() => null),
+        fetch(`https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`, { headers }).catch(() => null)
+      ]);
+
+      if (upstreamRes && upstreamRes.ok) {
+        const upstreamCommits = await upstreamRes.json();
+        let originCommits = [];
+        if (originRes && originRes.ok) {
+          originCommits = await originRes.json();
+        }
+
+        const originShas = new Set(originCommits.map(c => c.sha));
+        const originMessages = new Set(originCommits.map(c => c.commit?.message));
+
+        // Find the index of the first upstream commit that exists in origin
+        let matchIndex = upstreamCommits.findIndex(c =>
+          originShas.has(c.sha) || originMessages.has(c.commit?.message)
+        );
+
+        let behindBy = 0;
+        let status = 'UP_TO_DATE';
+
+        if (matchIndex === -1) {
+          // No match found in the last 30 commits
+          behindBy = upstreamCommits.length;
+          status = 'BEHIND';
+        } else if (matchIndex > 0) {
+          behindBy = matchIndex;
+          status = 'BEHIND';
+        } else {
+          behindBy = 0;
+          status = 'UP_TO_DATE';
+        }
+
+        return {
+          status,
+          behind_by: behindBy,
+          ahead_by: 0,
+          last_checked: new Date().toISOString(),
+          total_commits: upstreamCommits.length,
+          commits: upstreamCommits.slice(0, behindBy > 0 ? behindBy : 10).map(c => ({
+            sha: c.sha.substring(0, 7),
+            full_sha: c.sha,
+            message: c.commit.message,
+            author: c.commit.author?.name || c.author?.login || 'Unknown',
+            date: c.commit.author?.date,
+            html_url: c.html_url
+          }))
+        };
+      }
+
       return {
-        status: data.behind_by > 0 ? 'BEHIND' : 'UP_TO_DATE',
-        behind_by: data.behind_by || 0,
-        ahead_by: data.ahead_by || 0,
-        status_text: data.status,
+        status: 'ERROR',
+        behind_by: 0,
+        ahead_by: 0,
         last_checked: new Date().toISOString(),
-        total_commits: data.total_commits || 0,
-        commits: (data.commits || []).slice(0, 10).map(c => ({
-          sha: c.sha.substring(0, 7),
-          full_sha: c.sha,
-          message: c.commit.message,
-          author: c.commit.author?.name || c.author?.login || 'Unknown',
-          date: c.commit.author?.date,
-          html_url: c.html_url
-        }))
+        message: 'Không thể kết nối đến GitHub API'
       };
     } catch (err) {
       return {
