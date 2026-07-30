@@ -158,8 +158,39 @@ class UpstreamService {
     const headers = await this.getHeaders(config);
 
     const upstreamOwner = config.upstream_repo.split('/')[0];
-    const url = `https://api.github.com/repos/${config.origin_repo}/pulls`;
 
+    // Attempt 1: Sync Fork directly via GitHub Merge Upstream API
+    try {
+      const mergeUpstreamUrl = `https://api.github.com/repos/${config.origin_repo}/merge-upstream`;
+      const mergeRes = await fetch(mergeUpstreamUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ branch: config.target_branch })
+      });
+
+      const mergeData = await mergeRes.json().catch(() => ({}));
+
+      if (mergeRes.ok) {
+        return {
+          success: true,
+          message: mergeData.message || `Đã đồng bộ trực tiếp từ ${config.upstream_repo} thành công!`,
+          merge_type: mergeData.merge_type || 'merged'
+        };
+      }
+
+      if (mergeRes.status === 409) {
+        throw {
+          statusCode: 409,
+          code: 'MERGE_CONFLICT',
+          message: 'Xung đột code (Merge Conflict) trên GitHub. Cần mở GitHub để resolve conflict thủ công.'
+        };
+      }
+    } catch (err) {
+      if (err.statusCode) throw err;
+    }
+
+    // Attempt 2: Create a Pull Request from Upstream owner:branch
+    const url = `https://api.github.com/repos/${config.origin_repo}/pulls`;
     const body = {
       title: `sync: pull updates from upstream ${config.upstream_repo}`,
       head: `${upstreamOwner}:${config.target_branch}`,
@@ -173,13 +204,21 @@ class UpstreamService {
       body: JSON.stringify(body)
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      if (res.status === 422 && data.errors?.[0]?.message?.includes('A pull request already exists')) {
+      const errorMsg = data.errors ? data.errors.map(e => e.message).join('. ') : (data.message || '');
+      if (res.status === 409 || errorMsg.includes('already exists')) {
         throw { statusCode: 409, code: 'PR_EXISTS', message: 'Đã có Pull Request đồng bộ đang mở trên GitHub.' };
       }
-      throw { statusCode: res.status, code: 'GITHUB_API_ERROR', message: data.message || 'Không thể tạo Pull Request trên GitHub' };
+      if (res.status === 422) {
+        throw {
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: `Không thể tạo PR tự động: ${errorMsg || 'Repository không được tạo dưới dạng Fork chính thức trên GitHub hoặc đã đồng bộ đầy đủ.'}`
+        };
+      }
+      throw { statusCode: res.status, code: 'GITHUB_API_ERROR', message: errorMsg || 'Không thể tạo Pull Request trên GitHub' };
     }
 
     return {

@@ -83,10 +83,15 @@ export default function UpstreamSyncPage() {
   const handleCreateSyncPR = async () => {
     setActionLoading(true);
     try {
-      const res = await api.post<{ pr_url: string; pr_number: number }>('/v1/admin/upstream/create-pr');
-      toast.success(`Đã tạo Sync Pull Request #${res.pr_number} thành công!`);
-      if (res.pr_url) {
-        window.open(res.pr_url, '_blank');
+      const res = await api.post<{ pr_url?: string; pr_number?: number; message?: string }>('/v1/admin/upstream/create-pr');
+      if (res.pr_number) {
+        toast.success(`Đã tạo Sync Pull Request #${res.pr_number} thành công!`);
+        if (res.pr_url) {
+          window.open(res.pr_url, '_blank');
+        }
+      } else {
+        toast.success(res.message || 'Đã đồng bộ trực tiếp từ Upstream thành công!');
+        fetchStatusAndCommits();
       }
     } catch (err: any) {
       toast.error(err.message || 'Không thể tạo Pull Request');
