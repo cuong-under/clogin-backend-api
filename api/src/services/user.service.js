@@ -5,8 +5,14 @@ const { signUserJwt } = require('../utils/jwt');
 
 class UserService {
   async registerOwner({ email, password, license_key }) {
-    if (!email || !password || !license_key) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu email, password hoặc license_key' };
+    if (!email) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập địa chỉ email' };
+    }
+    if (!password) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu' };
+    }
+    if (!license_key) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập License Key kích hoạt' };
     }
 
     const lic = await prisma.license.findUnique({
@@ -15,11 +21,11 @@ class UserService {
     });
 
     if (!lic) {
-      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ' };
+      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ hoặc không tồn tại trên hệ thống' };
     }
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
-      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn' };
+      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn sử dụng' };
     }
 
     if (lic.owner) {
@@ -28,7 +34,7 @@ class UserService {
 
     const existingOwner = await prisma.owner.findUnique({ where: { email } });
     if (existingOwner) {
-      throw { statusCode: 409, code: 'DUPLICATE_EMAIL', message: 'Email đã được đăng ký' };
+      throw { statusCode: 409, code: 'DUPLICATE_EMAIL', message: 'Địa chỉ email này đã được đăng ký tài khoản' };
     }
 
     const owner = await prisma.owner.create({
@@ -49,8 +55,11 @@ class UserService {
   }
 
   async loginUser({ email, password, ip = '127.0.0.1', userAgent = '' }) {
-    if (!email || !password) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu email hoặc password' };
+    if (!email) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập địa chỉ email' };
+    }
+    if (!password) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu' };
     }
 
     let user = await prisma.owner.findUnique({ where: { email } });
@@ -61,21 +70,38 @@ class UserService {
       userType = 'worker';
     }
 
-    if (!user || !verifyPw(password, user.password_hash)) {
+    if (!user) {
       // Record failed attempt
       prisma.loginHistory.create({
         data: {
-          user_id: user ? user.id : 'unknown',
-          user_type: user ? userType : 'unknown',
+          user_id: 'unknown',
+          user_type: 'unknown',
           email,
           ip_address: ip,
           user_agent: userAgent,
           success: false,
-          fail_reason: 'INVALID_CREDENTIALS'
+          fail_reason: 'USER_NOT_FOUND'
         }
       }).catch(() => {});
 
-      throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email hoặc mật khẩu không đúng' };
+      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'Tài khoản chưa tồn tại trên hệ thống' };
+    }
+
+    if (!verifyPw(password, user.password_hash)) {
+      // Record failed attempt
+      prisma.loginHistory.create({
+        data: {
+          user_id: user.id,
+          user_type: userType,
+          email,
+          ip_address: ip,
+          user_agent: userAgent,
+          success: false,
+          fail_reason: 'INVALID_PASSWORD'
+        }
+      }).catch(() => {});
+
+      throw { statusCode: 401, code: 'INVALID_PASSWORD', message: 'Mật khẩu không chính xác' };
     }
 
     if (userType === 'worker' && !user.active) {
@@ -184,8 +210,11 @@ class UserService {
   }
 
   async createWorker(ownerId, { email, password, name }) {
-    if (!email || !password) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu email hoặc password' };
+    if (!email) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập email tài khoản Worker' };
+    }
+    if (!password) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu cho Worker' };
     }
 
     const owner = await prisma.owner.findUnique({ where: { id: ownerId } });
@@ -195,7 +224,7 @@ class UserService {
       where: { owner_id: ownerId, email }
     });
     if (existingWorker) {
-      throw { statusCode: 409, code: 'DUPLICATE_EMAIL', message: 'Email worker đã tồn tại' };
+      throw { statusCode: 409, code: 'DUPLICATE_EMAIL', message: 'Tài khoản Worker với email này đã tồn tại trong nhóm' };
     }
 
     const activeCount = await prisma.worker.count({
@@ -203,7 +232,7 @@ class UserService {
     });
 
     if (activeCount >= owner.max_worker_slots) {
-      throw { statusCode: 400, code: 'WORKER_LIMIT', message: `Đã đạt giới hạn ${owner.max_worker_slots} worker slots` };
+      throw { statusCode: 400, code: 'WORKER_LIMIT', message: `Đã đạt giới hạn tối đa ${owner.max_worker_slots} tài khoản Worker` };
     }
 
     const worker = await prisma.worker.create({

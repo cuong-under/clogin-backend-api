@@ -46,7 +46,7 @@ class LicenseService {
 
   async activateLicense({ key, hwid, device_name = 'Desktop PC', ip_address, owner_id, email }) {
     if (!key || !hwid) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin license_key hoặc hwid' };
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin license_key hoặc mã định danh HWID' };
     }
 
     const lic = await prisma.license.findUnique({
@@ -55,7 +55,7 @@ class LicenseService {
     });
 
     if (!lic) {
-      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ' };
+      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ hoặc không tồn tại trên hệ thống' };
     }
 
     if (lic.status === 'suspended') {
@@ -63,11 +63,11 @@ class LicenseService {
     }
 
     if (lic.status === 'revoked') {
-      throw { statusCode: 400, code: 'LICENSE_REVOKED', message: 'License Key đã bị thu hồi' };
+      throw { statusCode: 400, code: 'LICENSE_REVOKED', message: 'License Key đã bị thu hồi khỏi hệ thống' };
     }
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
-      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn' };
+      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn sử dụng' };
     }
 
     if (!lic.owner && (owner_id || email)) {
@@ -87,7 +87,7 @@ class LicenseService {
 
     const existingDevice = lic.devices.find(d => d.hwid === hwid);
     if (!existingDevice && lic.devices.length >= lic.max_devices) {
-      throw { statusCode: 400, code: 'LICENSE_LIMIT', message: 'License đã đạt giới hạn thiết bị cho phép' };
+      throw { statusCode: 400, code: 'LICENSE_LIMIT', message: `License Key đã đạt giới hạn tối đa ${lic.max_devices} thiết bị kích hoạt` };
     }
 
     if (existingDevice) {
@@ -124,7 +124,7 @@ class LicenseService {
 
   async verifyLicense({ key, hwid }) {
     if (!key || !hwid) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin license_key hoặc hwid' };
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin license_key hoặc mã định danh HWID' };
     }
 
     const lic = await prisma.license.findUnique({
@@ -133,20 +133,20 @@ class LicenseService {
     });
 
     if (!lic) {
-      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không tồn tại' };
+      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không tồn tại trên hệ thống' };
     }
 
     if (lic.status === 'suspended' || lic.status === 'revoked') {
-      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động' };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động hoặc đã bị thu hồi' };
     }
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
-      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn' };
+      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn sử dụng' };
     }
 
     const dev = lic.devices.find(d => d.hwid === hwid);
     if (!dev) {
-      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'Thiết bị chưa được kích hoạt cho License này' };
+      throw { statusCode: 400, code: 'DEVICE_NOT_ACTIVATED', message: 'Thiết bị này chưa được kích hoạt cho License Key' };
     }
 
     // Touch last_seen_at asynchronously
