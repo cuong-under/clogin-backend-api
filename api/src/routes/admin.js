@@ -16,6 +16,7 @@ const auditService = require('../services/audit.service');
 const releaseService = require('../services/release.service');
 const analyticsService = require('../services/analytics.service');
 const systemService = require('../services/system.service');
+const upstreamService = require('../services/upstream.service');
 
 const ADMIN_DEFAULT_EMAIL = process.env.ADMIN_DEFAULT_EMAIL || 'admin@clogin.nghemmo.com';
 const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || process.env.ADMIN_PASSWORD || 'CloginAdmin2026!';
@@ -687,6 +688,50 @@ router.put(['/settings/config', '/config'], requireRole(['super_admin']), async 
   try {
     const config = await systemService.updateConfig(req.body);
     return res.status(200).json({ data: config, config });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+// ==================== UPSTREAM SYNC ====================
+
+router.get('/upstream/config', requireRole(['super_admin', 'viewer']), async (req, res, next) => {
+  try {
+    const config = await upstreamService.getConfig();
+    return res.status(200).json({ data: config, ...config });
+  } catch (err) { next(err); }
+});
+
+router.put('/upstream/config', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const config = await upstreamService.updateConfig(req.body);
+    return res.status(200).json({ data: config, ...config });
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.get('/upstream/status', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const status = await upstreamService.getUpstreamStatus();
+    return res.status(200).json(status);
+  } catch (err) { next(err); }
+});
+
+router.get('/upstream/commits', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const commits = await upstreamService.listUpstreamCommits();
+    return res.status(200).json(commits);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.post('/upstream/create-pr', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await upstreamService.createSyncPullRequest();
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.post('/upstream/trigger-release', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await upstreamService.triggerReleaseWorkflow();
+    return res.status(200).json(result);
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 

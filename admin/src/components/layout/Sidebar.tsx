@@ -30,6 +30,7 @@ export const Sidebar: React.FC = () => {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Licenses: true,
     Users: true,
+    Releases: true,
     Settings: true,
   });
 
@@ -83,9 +84,12 @@ export const Sidebar: React.FC = () => {
       section: 'HỆ THỐNG & QUẢN TRỊ',
       items: [
         {
-          label: 'Phiên Bản App (Releases)',
-          href: '/releases',
+          label: 'Releases & Upstream',
           icon: <DownloadCloud className="w-4 h-4" />,
+          children: [
+            { label: 'Danh Sách Releases', href: '/releases' },
+            { label: 'Đồng Bộ Upstream', href: '/releases/upstream' },
+          ],
         },
         {
           label: 'Audit & Security',

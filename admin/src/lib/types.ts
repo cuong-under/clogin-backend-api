@@ -201,3 +201,31 @@ export interface PaginatedResponse<T> {
   limit: number;
   total_pages: number;
 }
+
+export interface UpstreamStatus {
+  status: 'UP_TO_DATE' | 'BEHIND' | 'UNAUTHORIZED' | 'AVAILABLE' | 'ERROR';
+  behind_by: number;
+  ahead_by: number;
+  status_text?: string;
+  last_checked: string;
+  total_commits?: number;
+  message?: string;
+  commits?: UpstreamCommit[];
+}
+
+export interface UpstreamCommit {
+  sha: string;
+  full_sha?: string;
+  message: string;
+  author: string;
+  avatar_url?: string;
+  date: string;
+  html_url: string;
+}
+
+export interface UpstreamConfig {
+  github_token: string;
+  upstream_repo: string;
+  origin_repo: string;
+  target_branch: string;
+}
