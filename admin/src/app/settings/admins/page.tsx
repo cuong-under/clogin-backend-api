@@ -88,11 +88,16 @@ export default function AdminUsersPage() {
           return;
         }
 
-        await api.put(`/v1/admin/settings/admins/${editingAdmin.id}`, {
+        const updatePayload: Record<string, any> = {
           name: form.name,
           role: form.role,
           active: form.active,
-        });
+        };
+        if (form.password && form.password.trim() !== '') {
+          updatePayload.password = form.password;
+        }
+
+        await api.put(`/v1/admin/settings/admins/${editingAdmin.id}`, updatePayload);
         toast.success('Đã cập nhật tài khoản Admin');
       } else {
         await api.post('/v1/admin/settings/admins', form);
@@ -260,16 +265,14 @@ export default function AdminUsersPage() {
             required
           />
 
-          {!editingAdmin && (
-            <Input
-              label="Mật khẩu khởi tạo"
-              type="password"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              required
-            />
-          )}
+          <Input
+            label={editingAdmin ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu khởi tạo'}
+            type="password"
+            placeholder="••••••••"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            required={!editingAdmin}
+          />
 
           <Select
             label="Phân quyền (Role)"

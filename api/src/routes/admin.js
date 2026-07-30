@@ -47,12 +47,7 @@ router.post('/auth/login', async (req, res, next) => {
     }
 
     if (!adminUser || !verifyPw(password, adminUser.password_hash)) {
-      // Also check raw fallback password if initial setup
-      if (adminUser && password === ADMIN_DEFAULT_PASSWORD) {
-        // match
-      } else {
-        return sendError(res, 401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu quản trị không chính xác');
-      }
+      return sendError(res, 401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu quản trị không chính xác');
     }
 
     if (adminUser && !adminUser.active) {
