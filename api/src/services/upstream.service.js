@@ -92,7 +92,7 @@ class UpstreamService {
       // 2. Smart Fallback for Standalone/Non-Fork Repos:
       // Fetch recent commits from both origin and upstream to accurately compute `behind_by`
       const [originRes, upstreamRes] = await Promise.all([
-        fetch(`https://api.github.com/repos/${config.origin_repo}/commits?per_page=30`, { headers }).catch(() => null),
+        fetch(`https://api.github.com/repos/${config.origin_repo}/commits?per_page=100`, { headers }).catch(() => null),
         fetch(`https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`, { headers }).catch(() => null)
       ]);
 
@@ -101,21 +101,42 @@ class UpstreamService {
         let originCommits = [];
         if (originRes && originRes.ok) {
           originCommits = await originRes.json();
+        } else if (originRes && (originRes.status === 401 || originRes.status === 403 || originRes.status === 404)) {
+          return {
+            status: 'UNAUTHORIZED',
+            behind_by: 0,
+            ahead_by: 0,
+            last_checked: new Date().toISOString(),
+            message: `Không thể đọc dữ liệu repo '${config.origin_repo}'. Vui lòng kiểm tra lại GitHub Token trong Cấu Hình.`
+          };
         }
 
-        const originShas = new Set(originCommits.map(c => c.sha));
-        const originMessages = new Set(originCommits.map(c => c.commit?.message));
+        const originShas = new Set();
+        const originMessages = new Set();
+
+        originCommits.forEach(c => {
+          if (c.sha) {
+            originShas.add(c.sha);
+            originShas.add(c.sha.substring(0, 7));
+          }
+          if (c.commit?.message) {
+            originMessages.add(c.commit.message.trim().toLowerCase());
+          }
+        });
 
         // Find the index of the first upstream commit that exists in origin
-        let matchIndex = upstreamCommits.findIndex(c =>
-          originShas.has(c.sha) || originMessages.has(c.commit?.message)
-        );
+        let matchIndex = upstreamCommits.findIndex(c => {
+          const uSha = c.sha;
+          const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
+          const uCleanMsg = c.commit?.message ? c.commit.message.trim().toLowerCase() : '';
+          return originShas.has(uSha) || originShas.has(uShortSha) || (uCleanMsg && originMessages.has(uCleanMsg));
+        });
 
         let behindBy = 0;
         let status = 'UP_TO_DATE';
 
         if (matchIndex === -1) {
-          // No match found in the last 30 commits
+          // No match found in recent history
           behindBy = upstreamCommits.length;
           status = 'BEHIND';
         } else if (matchIndex > 0) {
