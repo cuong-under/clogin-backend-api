@@ -15,7 +15,20 @@ router.post('/activate', async (req, res, next) => {
     const device_name = req.body.device_name || queryDevice || 'Desktop PC';
     const ip_address = getClientIp(req);
 
-    const result = await licenseService.activateLicense({ key, hwid, device_name, ip_address });
+    let owner_id = req.body.owner_id || req.body.user_id;
+    let email = req.body.email;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const { verifyUserJwt } = require('../utils/jwt');
+        const decoded = verifyUserJwt(authHeader.split(' ')[1]);
+        if (decoded && decoded.payload && decoded.payload.sub) {
+          owner_id = decoded.payload.owner_id || decoded.payload.sub;
+        }
+      } catch (_) {}
+    }
+
+    const result = await licenseService.activateLicense({ key, hwid, device_name, ip_address, owner_id, email });
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {

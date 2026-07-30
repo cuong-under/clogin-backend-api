@@ -3,14 +3,55 @@ const prisma = new PrismaClient();
 const { uuid } = require('../utils/validators');
 
 class LicenseService {
-  async activateLicense({ key, hwid, device_name = 'Desktop PC', ip_address }) {
+  _formatLicense(l) {
+    if (!l) return null;
+    const ownerEmail = l.owner ? l.owner.email : null;
+    const ownerId = l.owner ? l.owner.id : null;
+    const activeDevicesCount = l.devices ? l.devices.length : 0;
+    const validUntil = l.expires_at ? l.expires_at.toISOString() : null;
+
+    return {
+      id: l.id,
+      key: l.key,
+      plan: l.plan_name,
+      plan_name: l.plan_name,
+      plan_id: l.plan_id,
+      max_devices: l.max_devices,
+      active_devices: activeDevicesCount,
+      active_devices_count: activeDevicesCount,
+      status: l.status,
+      expires_at: validUntil,
+      valid_until: validUntil,
+      suspended_at: l.suspended_at ? l.suspended_at.toISOString() : null,
+      suspend_reason: l.suspend_reason,
+      notes: l.notes || '',
+      created_at: l.created_at ? l.created_at.toISOString() : new Date().toISOString(),
+      owner: l.owner || null,
+      owner_id: ownerId,
+      owner_email: ownerEmail,
+      devices: (l.devices || []).map(d => ({
+        id: d.id,
+        device_id: d.hwid,
+        hwid: d.hwid,
+        device_name: d.device_name || 'Desktop PC',
+        os: 'Windows',
+        ip: d.ip_address || '',
+        ip_address: d.ip_address || '',
+        last_active: d.last_seen_at ? d.last_seen_at.toISOString() : (d.activated_at ? d.activated_at.toISOString() : ''),
+        activated_at: d.activated_at ? d.activated_at.toISOString() : '',
+        last_seen_at: d.last_seen_at ? d.last_seen_at.toISOString() : ''
+      }))
+    };
+  }
+
+  async activateLicense({ key, hwid, device_name = 'Desktop PC', ip_address, owner_id, email }) {
     if (!key || !hwid) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin license_key hoặc hwid' };
     }
 
     const lic = await prisma.license.findUnique({
       where: { key },
-      include: { devices: true }
+      include: { devices: true, owner: true }
     });
 
     if (!lic) {
@@ -27,6 +68,21 @@ class LicenseService {
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
       throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn' };
+    }
+
+    if (!lic.owner && (owner_id || email)) {
+      try {
+        const whereOwner = owner_id ? { id: owner_id } : { email };
+        const owner = await prisma.owner.findUnique({ where: whereOwner });
+        if (owner && !owner.license_id) {
+          await prisma.owner.update({
+            where: { id: owner.id },
+            data: { license_id: lic.id }
+          });
+        }
+      } catch (err) {
+        console.error('[Activate] Error linking owner to license:', err);
+      }
     }
 
     const existingDevice = lic.devices.find(d => d.hwid === hwid);
@@ -139,30 +195,7 @@ class LicenseService {
       prisma.license.count({ where })
     ]);
 
-    const formatted = licenses.map(l => ({
-      id: l.id,
-      key: l.key,
-      plan: l.plan_name,
-      plan_name: l.plan_name,
-      plan_id: l.plan_id,
-      max_devices: l.max_devices,
-      active_devices: l.devices.length,
-      status: l.status,
-      expires_at: l.expires_at ? l.expires_at.toISOString() : null,
-      suspended_at: l.suspended_at ? l.suspended_at.toISOString() : null,
-      suspend_reason: l.suspend_reason,
-      notes: l.notes,
-      created_at: l.created_at.toISOString(),
-      owner: l.owner,
-      devices: l.devices.map(d => ({
-        id: d.id,
-        hwid: d.hwid,
-        device_name: d.device_name,
-        ip_address: d.ip_address,
-        activated_at: d.activated_at.toISOString(),
-        last_seen_at: d.last_seen_at.toISOString()
-      }))
-    }));
+    const formatted = licenses.map(l => this._formatLicense(l));
 
     return { data: formatted, licenses: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
@@ -173,7 +206,7 @@ class LicenseService {
       include: { devices: true, owner: true, plan: true }
     });
     if (!lic) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy license' };
-    return lic;
+    return this._formatLicense(lic);
   }
 
   async createLicense({ plan, plan_id, plan_name, max_devices = 1, days_valid, notes = '', coupon_code }) {
