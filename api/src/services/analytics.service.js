@@ -2,7 +2,11 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 class AnalyticsService {
-  async getDashboardStats() {
+  async getDashboardStats(range = '7d') {
+    let days = 7;
+    if (range === '30d') days = 30;
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
     const [
       totalLicenses,
       activeLicenses,
@@ -12,7 +16,10 @@ class AnalyticsService {
       totalOwners,
       totalWorkers,
       totalProfiles,
-      recentAuditLogs
+      recentAuditCount,
+      recentAuditLogs,
+      recentLogins,
+      recentOwners
     ] = await Promise.all([
       prisma.license.count(),
       prisma.license.count({ where: { status: 'active' } }),
@@ -24,10 +31,66 @@ class AnalyticsService {
       prisma.cloudProfile.count(),
       prisma.auditLog.count({
         where: { timestamp: { gte: new Date(Date.now() - 86400000) } }
+      }),
+      prisma.auditLog.findMany({
+        orderBy: { timestamp: 'desc' },
+        take: 10
+      }),
+      prisma.loginHistory.findMany({
+        where: { created_at: { gte: startDate } },
+        select: { created_at: true }
+      }),
+      prisma.owner.findMany({
+        where: { created_at: { gte: startDate } },
+        select: { created_at: true }
       })
     ]);
 
+    // Group logins and new users by day
+    const dateMap = new Map();
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split('T')[0];
+      dateMap.set(dateStr, { date: dateStr, logins: 0, new_users: 0 });
+    }
+
+    recentLogins.forEach(log => {
+      const dStr = log.created_at.toISOString().split('T')[0];
+      if (dateMap.has(dStr)) dateMap.get(dStr).logins += 1;
+    });
+
+    recentOwners.forEach(o => {
+      const dStr = o.created_at.toISOString().split('T')[0];
+      if (dateMap.has(dStr)) dateMap.get(dStr).new_users += 1;
+    });
+
+    const logins_by_day = Array.from(dateMap.values()).map(item => ({ date: item.date, count: item.logins }));
+    const new_users_by_day = Array.from(dateMap.values()).map(item => ({ date: item.date, count: item.new_users }));
+
+    const recent_activity = recentAuditLogs.map(l => ({
+      id: l.id,
+      user_id: l.user_id,
+      user_email: l.user_name || l.user_id,
+      user_type: l.user_type,
+      action: l.action,
+      action_type: l.user_type === 'system' ? 'SYSTEM' : 'USER',
+      action_name: l.action,
+      target: l.target,
+      ip: l.ip_address || '',
+      ip_address: l.ip_address || '',
+      user_agent: l.user_agent,
+      timestamp: l.timestamp.toISOString(),
+      created_at: l.timestamp.toISOString()
+    }));
+
     return {
+      total_licenses: totalLicenses,
+      active_users: totalOwners,
+      cloud_profiles: totalProfiles,
+      active_devices: totalDevices,
+      logins_by_day,
+      new_users_by_day,
+      recent_activity,
       overview: {
         total_licenses: totalLicenses,
         active_licenses: activeLicenses,
@@ -37,7 +100,7 @@ class AnalyticsService {
         total_owners: totalOwners,
         total_workers: totalWorkers,
         total_profiles: totalProfiles,
-        audit_events_24h: recentAuditLogs
+        audit_events_24h: recentAuditCount
       }
     };
   }

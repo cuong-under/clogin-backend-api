@@ -232,6 +232,7 @@ class ProfileService {
       folder: p.folder,
       has_cookies: p.cookies !== null && Array.isArray(p.cookies) ? p.cookies.length > 0 : !!p.cookies,
       assigned_count: (p.assigned_worker_ids || []).length,
+      assigned_workers_count: (p.assigned_worker_ids || []).length,
       assigned_worker_ids: p.assigned_worker_ids,
       created_at: p.created_at.toISOString(),
       updated_at: p.updated_at.toISOString()

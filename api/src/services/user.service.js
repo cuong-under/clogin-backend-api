@@ -287,10 +287,15 @@ class UserService {
       license_key: o.license ? o.license.key : null,
       license_id: o.license_id,
       max_worker_slots: o.max_worker_slots,
+      max_workers: o.max_worker_slots,
       worker_count: o._count.workers,
+      workers_count: o._count.workers,
       profile_count: o._count.profiles,
+      profiles_count: o._count.profiles,
       active: o.active,
+      status: o.active ? 'active' : 'suspended',
       last_login_at: o.last_login_at ? o.last_login_at.toISOString() : null,
+      last_login: o.last_login_at ? o.last_login_at.toISOString() : null,
       created_at: o.created_at ? o.created_at.toISOString() : null,
       workers: o.workers
     }));
@@ -361,7 +366,20 @@ class UserService {
       prisma.worker.count({ where })
     ]);
 
-    return { data: workers, workers, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
+    const formatted = workers.map(w => ({
+      id: w.id,
+      email: w.email,
+      name: w.name,
+      owner_id: w.owner_id,
+      owner_email: w.owner ? w.owner.email : '',
+      owner: w.owner,
+      active: w.active,
+      last_login_at: w.last_login_at ? w.last_login_at.toISOString() : null,
+      last_login: w.last_login_at ? w.last_login_at.toISOString() : null,
+      created_at: w.created_at ? w.created_at.toISOString() : null
+    }));
+
+    return { data: formatted, workers: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getWorkerById(id) {

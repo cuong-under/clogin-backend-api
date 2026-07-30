@@ -8,20 +8,35 @@ class SystemService {
     const plans = await prisma.licensePlan.findMany({
       orderBy: { sort_order: 'asc' }
     });
-    return { data: plans, plans };
+    const formatted = plans.map(p => ({
+      ...p,
+      price: p.price_vnd,
+      price_vnd: p.price_vnd
+    }));
+    return { data: formatted, plans: formatted };
   }
 
   async createPlan(data) {
     if (!data.name || !data.slug) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu name hoặc slug cho gói dịch vụ' };
     }
-    return prisma.licensePlan.create({ data });
+    const createData = { ...data };
+    if (createData.price !== undefined && createData.price_vnd === undefined) {
+      createData.price_vnd = parseInt(createData.price) || 0;
+    }
+    delete createData.price;
+    return prisma.licensePlan.create({ data: createData });
   }
 
   async updatePlan(id, data) {
+    const updateData = { ...data };
+    if (updateData.price !== undefined && updateData.price_vnd === undefined) {
+      updateData.price_vnd = parseInt(updateData.price) || 0;
+    }
+    delete updateData.price;
     return prisma.licensePlan.update({
       where: { id },
-      data
+      data: updateData
     });
   }
 
@@ -35,7 +50,17 @@ class SystemService {
     const coupons = await prisma.coupon.findMany({
       orderBy: { created_at: 'desc' }
     });
-    return { data: coupons, coupons };
+
+    const planIds = coupons.map(c => c.plan_id).filter(Boolean);
+    const plans = planIds.length > 0 ? await prisma.licensePlan.findMany({ where: { id: { in: planIds } } }) : [];
+    const planMap = new Map(plans.map(p => [p.id, p.name]));
+
+    const formatted = coupons.map(c => ({
+      ...c,
+      plan_name: c.plan_id ? (planMap.get(c.plan_id) || 'Không xác định') : 'Tất cả các gói'
+    }));
+
+    return { data: formatted, coupons: formatted };
   }
 
   async createCoupon(data) {

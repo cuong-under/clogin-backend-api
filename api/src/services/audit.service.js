@@ -70,15 +70,19 @@ class AuditService {
       id: l.id,
       owner_id: l.owner_id,
       user_id: l.user_id,
-      user_type: l.user_type,
+      user_email: l.user_name || l.user_id || 'System',
       user_name: l.user_name,
+      user_type: l.user_type,
       action: l.action,
+      action_name: l.action,
+      action_type: l.user_type === 'system' ? 'SYSTEM' : 'INFO',
       target: l.target,
-      ip_address: l.ip_address,
+      ip: l.ip_address || '',
+      ip_address: l.ip_address || '',
       user_agent: l.user_agent,
       metadata: l.metadata,
-      timestamp: l.timestamp.getTime(),
-      created_at: l.timestamp.toISOString()
+      timestamp: l.timestamp ? l.timestamp.toISOString() : new Date().toISOString(),
+      created_at: l.timestamp ? l.timestamp.toISOString() : new Date().toISOString()
     }));
 
     return { data: formatted, audit: formatted, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
@@ -108,7 +112,22 @@ class AuditService {
       prisma.loginHistory.count({ where })
     ]);
 
-    return { data: history, login_history: history, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
+    const formattedHistory = history.map(h => ({
+      id: h.id,
+      user_id: h.user_id,
+      user_type: h.user_type,
+      email: h.email,
+      ip: h.ip_address || '',
+      ip_address: h.ip_address || '',
+      user_agent: h.user_agent,
+      country: h.country || 'N/A',
+      success: h.success,
+      fail_reason: h.fail_reason,
+      timestamp: h.created_at ? h.created_at.toISOString() : new Date().toISOString(),
+      created_at: h.created_at ? h.created_at.toISOString() : new Date().toISOString()
+    }));
+
+    return { data: formattedHistory, login_history: formattedHistory, total, page, per_page: perPage, limit: perPage, total_pages: Math.ceil(total / perPage) };
   }
 
   async getSuspiciousLogins() {

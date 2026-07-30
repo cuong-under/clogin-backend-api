@@ -128,7 +128,8 @@ router.use(adminAuth);
 
 router.get('/dashboard/stats', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
-    const stats = await analyticsService.getDashboardStats();
+    const range = req.query.range || req.query.period || '7d';
+    const stats = await analyticsService.getDashboardStats(range);
     return res.status(200).json(stats);
   } catch (err) {
     next(err);
