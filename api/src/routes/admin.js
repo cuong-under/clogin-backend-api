@@ -31,11 +31,13 @@ router.post('/auth/login', async (req, res, next) => {
 
     let adminUser = await prisma.adminUser.findUnique({ where: { email } });
 
+    const cookieOpts = { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true };
+
     // Fallback default super admin
     if (!adminUser && email === ADMIN_DEFAULT_EMAIL && password === ADMIN_DEFAULT_PASSWORD) {
       const token = signAdminJwt({ sub: 'super-admin-root', email: ADMIN_DEFAULT_EMAIL, role: 'super_admin' });
-      res.cookie('clogin_admin_token', token, { httpOnly: true, maxAge: 86400000, path: '/' });
-      res.cookie('clogin_admin_session', token, { httpOnly: true, maxAge: 86400000, path: '/' });
+      res.cookie('clogin_admin_token', token, cookieOpts);
+      res.cookie('clogin_admin_session', token, cookieOpts);
       return res.status(200).json({
         success: true,
         token,
@@ -69,8 +71,8 @@ router.post('/auth/login', async (req, res, next) => {
 
     const token = signAdminJwt({ sub: adminId, email: adminEmail, role: adminRole });
 
-    res.cookie('clogin_admin_token', token, { httpOnly: true, maxAge: 86400000, path: '/' });
-    res.cookie('clogin_admin_session', token, { httpOnly: true, maxAge: 86400000, path: '/' });
+    res.cookie('clogin_admin_token', token, cookieOpts);
+    res.cookie('clogin_admin_session', token, cookieOpts);
 
     return res.status(200).json({
       success: true,

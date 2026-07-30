@@ -1,13 +1,26 @@
+import { getStoredAdminToken, setStoredAdminToken, setStoredAdmin } from './auth';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-clogin.nghemmo.com';
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getStoredAdminToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers,
   });
   if (res.status === 401) {
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      setStoredAdminToken(null);
+      setStoredAdmin(null);
       window.location.href = '/login';
     }
     throw new Error('Unauthorized');
