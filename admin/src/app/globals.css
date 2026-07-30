@@ -1,28 +1,135 @@
 @import "tailwindcss";
 
+:root {
+  --bg-0: #05161e;
+  --bg-1: #0a202a;
+  --bg-2: #112b38;
+  --bg-3: #183747;
+  --bg-hover: #1e4254;
+
+  --bd-1: #194354;
+  --bd-2: #275c73;
+  --bd-3: #00f0ff;
+
+  --tx-1: #ffffff;
+  --tx-2: #b0d5e3;
+  --tx-3: #6b9eb3;
+  --tx-4: #487385;
+
+  --accent: #00f0ff;
+  --accent-hi: #38bdf8;
+  --accent-pink: #e040fb;
+  --accent-dim: rgba(0, 240, 255, 0.18);
+
+  --ok: #00ffb7;
+  --warn: #ffb703;
+  --err: #ff2a6d;
+
+  --grad-hero: linear-gradient(135deg, #00f0ff 0%, #0099ff 60%, #e040fb 100%);
+  --grad-cyber-button: linear-gradient(135deg, #00f0ff 0%, #0088ff 100%);
+  --grad-cyber-card: linear-gradient(135deg, rgba(10, 32, 42, 0.95), rgba(17, 43, 56, 0.95));
+
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 14px;
+}
+
 @layer base {
   body {
-    background-color: #0f172a;
-    color: #f8fafc;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background: radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.15) 0%, transparent 45%),
+                radial-gradient(circle at 85% 85%, rgba(0, 153, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(224, 64, 251, 0.08) 0%, transparent 60%),
+                #05161e;
+    color: var(--tx-1);
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
   }
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom Cyber Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--bg-0);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: var(--bd-2);
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--accent);
+}
+
+/* Clogin Brand Text Gradient */
+.brand-gradient-text {
+  background: var(--grad-hero);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Clogin Primary Button */
+.clogin-btn-primary {
+  background: var(--grad-cyber-button);
+  color: #05161e;
+  font-weight: 700;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+  transition: all 0.15s ease;
+}
+
+.clogin-btn-primary:hover {
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.clogin-btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* Clogin Card */
+.clogin-card {
+  background: var(--grad-cyber-card);
+  border: 1px solid var(--bd-1);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.05);
+}
+
+/* Clogin Table */
+.clogin-table-head {
+  background: var(--bg-1);
+  color: var(--tx-3);
+  border-bottom: 1px solid var(--bd-1);
+}
+
+.clogin-table-row {
+  border-bottom: 1px solid var(--bd-1);
+  transition: background 0.12s ease;
+}
+
+.clogin-table-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Status Badges */
+.badge-active {
+  background: rgba(0, 255, 183, 0.12);
+  color: var(--ok);
+  border: 1px solid rgba(0, 255, 183, 0.3);
+}
+
+.badge-expired {
+  background: rgba(255, 42, 109, 0.12);
+  color: var(--err);
+  border: 1px solid rgba(255, 42, 109, 0.3);
+}
+
+.badge-suspended {
+  background: rgba(255, 183, 3, 0.12);
+  color: var(--warn);
+  border: 1px solid rgba(255, 183, 3, 0.3);
 }

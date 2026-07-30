@@ -19,16 +19,16 @@ export const Card: React.FC<CardProps> = ({
   bodyClassName,
 }) => {
   return (
-    <div className={cn('rounded-xl bg-slate-800 border border-slate-700/80 shadow-md overflow-hidden', className)}>
+    <div className={cn('rounded-xl bg-gradient-to-br from-[#0a202a] to-[#112b38] border border-[#194354] shadow-xl backdrop-blur-md overflow-hidden', className)}>
       {(title || extra) && (
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/70">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#194354] bg-[#07151c]/60">
           <div>
             {typeof title === 'string' ? (
-              <h3 className="text-base font-semibold text-slate-100">{title}</h3>
+              <h3 className="text-base font-bold text-white tracking-wide">{title}</h3>
             ) : (
               title
             )}
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-[#6b9eb3] mt-0.5">{subtitle}</p>}
           </div>
           {extra && <div>{extra}</div>}
         </div>

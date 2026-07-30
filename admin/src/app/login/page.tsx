@@ -6,6 +6,7 @@ import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import { loginAdmin } from '@/lib/auth';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { ShardLogo } from '@/components/ui/ShardLogo';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,27 +35,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#05161e] flex flex-col items-center justify-center p-4 relative overflow-hidden select-none"
+         style={{
+           background: 'radial-gradient(circle at 50% 30%, #0d3244 0%, #05161e 70%)'
+         }}>
       {/* Background Glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#00f0ff]/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo & Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sky-400 font-bold text-slate-950 text-2xl shadow-xl shadow-sky-400/20 mb-4">
-            C
+        <div className="text-center mb-8 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-3">
+            <ShardLogo size={42} />
+            <span className="text-3xl font-extrabold tracking-wider brand-gradient-text">
+              CLOGIN STUDIO
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Clogin Studio</h1>
-          <p className="text-sm text-slate-400 mt-1">Hệ thống Quản trị & Điều hành Portal Admin</p>
+          <p className="text-xs text-[#6b9eb3]">Hệ thống Quản trị & Điều hành Portal Admin</p>
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
-          <h2 className="text-lg font-semibold text-slate-200 mb-6">Đăng nhập tài khoản Admin</h2>
+        <div className="clogin-card p-8">
+          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span>🛡️</span>
+            <span>Đăng nhập tài khoản Admin</span>
+          </h2>
 
           {error && (
-            <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-3 text-rose-400 text-sm">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div className="mb-6 p-3.5 rounded-lg bg-[#ff2a6d]/15 border border-[#ff2a6d]/30 flex items-start gap-3 text-[#ff2a6d] text-xs font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -66,7 +75,7 @@ export default function LoginPage() {
               placeholder="admin@clogin.nghemmo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              icon={<Mail className="w-4 h-4" />}
+              icon={<Mail className="w-4 h-4 text-[#6b9eb3]" />}
               required
             />
 
@@ -76,7 +85,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              icon={<Lock className="w-4 h-4" />}
+              icon={<Lock className="w-4 h-4 text-[#6b9eb3]" />}
               required
             />
 
@@ -84,16 +93,16 @@ export default function LoginPage() {
               type="submit"
               variant="primary"
               size="lg"
-              className="w-full mt-2"
+              className="w-full mt-2 clogin-btn-primary h-11 text-sm font-extrabold"
               isLoading={loading}
-              icon={<ArrowRight className="w-4 h-4" />}
+              icon={<ArrowRight className="w-4 h-4 text-[#05161e]" />}
             >
               Đăng nhập Portal
             </Button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-slate-500 mt-8">
+        <p className="text-center text-xs text-[#487385] mt-8">
           © {new Date().getFullYear()} Clogin Studio. Tất cả quyền được bảo lưu.
         </p>
       </div>

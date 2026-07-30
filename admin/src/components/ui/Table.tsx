@@ -40,28 +40,28 @@ export function Table<T>({
   const allSelected = data.length > 0 && data.every((item) => selectedIds.includes(getId(item)));
 
   return (
-    <div className="w-full overflow-x-auto rounded-lg border border-slate-700 bg-slate-800/40">
-      <table className="w-full text-left text-sm text-slate-300">
-        <thead className="bg-slate-800 text-xs uppercase font-medium text-slate-400 border-b border-slate-700">
+    <div className="w-full overflow-x-auto rounded-xl border border-[#194354] bg-[#0a202a]/80 shadow-xl">
+      <table className="w-full text-left text-xs text-[#b0d5e3]">
+        <thead className="bg-[#07151c] text-[11px] uppercase font-bold text-[#6b9eb3] border-b border-[#194354] tracking-wider">
           <tr>
             {selectable && (
-              <th className="p-4 w-10">
+              <th className="p-3.5 w-10">
                 <input
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e) => onSelectAll?.(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-900 text-sky-400 focus:ring-sky-400 focus:ring-offset-slate-900"
+                  className="rounded border-[#194354] bg-[#112b38] text-[#00f0ff] focus:ring-[#00f0ff]"
                 />
               </th>
             )}
             {columns.map((col, idx) => (
-              <th key={idx} className={cn('px-4 py-3.5 font-medium', col.className)}>
+              <th key={idx} className={cn('px-4 py-3.5 font-bold', col.className)}>
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-700/60">
+        <tbody className="divide-y divide-[#194354]">
           {loading ? (
             <tr>
               <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-4">
@@ -83,23 +83,23 @@ export function Table<T>({
                   key={id || rowIdx}
                   onClick={() => onRowClick?.(item)}
                   className={cn(
-                    'hover:bg-slate-700/30 transition-colors',
-                    isSelected && 'bg-sky-500/10 hover:bg-sky-500/15',
+                    'hover:bg-[#1e4254]/50 transition-colors',
+                    isSelected && 'bg-[#00f0ff]/10 hover:bg-[#00f0ff]/15',
                     onRowClick && 'cursor-pointer'
                   )}
                 >
                   {selectable && (
-                    <td className="p-4 w-10" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-3.5 w-10" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={(e) => onSelectOne?.(id, e.target.checked)}
-                        className="rounded border-slate-700 bg-slate-900 text-sky-400 focus:ring-sky-400 focus:ring-offset-slate-900"
+                        className="rounded border-[#194354] bg-[#112b38] text-[#00f0ff] focus:ring-[#00f0ff]"
                       />
                     </td>
                   )}
                   {columns.map((col, colIdx) => (
-                    <td key={colIdx} className={cn('px-4 py-3.5 text-slate-200', col.className)}>
+                    <td key={colIdx} className={cn('px-4 py-3.5 text-white font-medium', col.className)}>
                       {col.cell
                         ? col.cell(item)
                         : col.accessorKey
