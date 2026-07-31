@@ -16,6 +16,19 @@ router.get('/update', async (req, res, next) => {
   }
 });
 
+// Manifest cho Tauri auto-updater (tauri-plugin-updater).
+router.get('/update/manifest', async (req, res, next) => {
+  try {
+    const manifest = await releaseService.getUpdateManifest();
+    return res.status(200).json(manifest);
+  } catch (err) {
+    if (err.statusCode) {
+      return sendError(res, err.statusCode, err.code, err.message);
+    }
+    next(err);
+  }
+});
+
 router.get('/announcements', async (req, res, next) => {
   try {
     const announcements = await systemService.getActiveAnnouncements();

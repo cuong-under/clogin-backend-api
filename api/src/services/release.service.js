@@ -43,6 +43,50 @@ class ReleaseService {
     return { data: releases, releases };
   }
 
+  /**
+   * Manifest cho Tauri auto-updater (tauri-plugin-updater).
+   *
+   * Đọc cấu hình từ env vars (cập nhật mỗi lần phát hành trên Coolify):
+   *   APP_INSTALLER_URL   — URL file installer .exe ký (NSIS setup)
+   *   APP_SIGNATURE       — minisign signature (base64) của installer
+   *   APP_RELEASE_NOTES   — ghi chú phát hành (optional)
+   * Version lấy từ bản release đang current trong DB; nếu env
+   * APP_RELEASE_VERSION được đặt thì ưu tiên env.
+   */
+  async getUpdateManifest() {
+    const installerUrl = process.env.APP_INSTALLER_URL;
+    const signature = process.env.APP_SIGNATURE;
+
+    const envVersion = process.env.APP_RELEASE_VERSION;
+    let version = envVersion;
+    if (!version) {
+      const release = await prisma.release.findFirst({
+        where: { is_current: true },
+        orderBy: { published_at: 'desc' }
+      });
+      version = release ? release.version : '0.1.10';
+    }
+
+    if (!installerUrl || !signature) {
+      const err = new Error('Chưa cấu hình APP_INSTALLER_URL / APP_SIGNATURE cho bản phát hành');
+      err.statusCode = 404;
+      err.code = 'UPDATE_NOT_CONFIGURED';
+      throw err;
+    }
+
+    return {
+      version,
+      notes: process.env.APP_RELEASE_NOTES || `Phiên bản Clogin Studio v${version}`,
+      pub_date: new Date().toISOString(),
+      platforms: {
+        'windows-x86_64': {
+          signature,
+          url: installerUrl
+        }
+      }
+    };
+  }
+
   async createRelease({ version, channel = 'stable', changelog = '', download_url, min_version, is_current = false }) {
     if (!version) throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin phiên bản' };
 
