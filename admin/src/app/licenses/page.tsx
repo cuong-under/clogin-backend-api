@@ -269,7 +269,7 @@ export default function LicensesPage() {
           className="w-full sm:w-80"
         />
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           <Select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -279,7 +279,7 @@ export default function LicensesPage() {
               { value: 'expired', label: 'Hết hạn' },
               { value: 'suspended', label: 'Đã đình chỉ' },
             ]}
-            className="w-40"
+            className="flex-1 sm:flex-none sm:w-40 min-w-[120px]"
           />
 
           <Select
@@ -289,16 +289,16 @@ export default function LicensesPage() {
               { value: 'all', label: 'Tất cả gói cước' },
               ...plans.map((p) => ({ value: p.id, label: p.name })),
             ]}
-            className="w-40"
+            className="flex-1 sm:flex-none sm:w-40 min-w-[120px]"
           />
         </div>
       </div>
 
       {/* Bulk Actions Bar */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
           <span className="text-xs font-semibold text-sky-300">Đã chọn {selectedIds.length} License</span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -360,7 +360,7 @@ export default function LicensesPage() {
             options={plans.map((p) => ({ value: p.id, label: `${p.name} (${p.max_devices} thiết bị)` }))}
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Số thiết bị tối đa"
               type="number"
@@ -404,7 +404,7 @@ export default function LicensesPage() {
           title="Chi tiết mã License Key"
           maxWidth="2xl"
           footer={
-            <div className="flex items-center justify-between w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3">
               <Button
                 variant="danger"
                 size="sm"
@@ -412,7 +412,7 @@ export default function LicensesPage() {
               >
                 Xóa License
               </Button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"

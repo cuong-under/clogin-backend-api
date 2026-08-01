@@ -252,7 +252,7 @@ export default function AuditPage() {
       {/* Tab 1: Audit Log */}
       {activeTab === 'audit' && (
         <div className="space-y-4">
-          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 flex items-center justify-between">
+          <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
             <Select
               value={auditTypeFilter}
               onChange={(e) => setAuditTypeFilter(e.target.value)}
@@ -263,7 +263,7 @@ export default function AuditPage() {
                 { value: 'USER', label: 'Người dùng (USER)' },
                 { value: 'SECURITY', label: 'Bảo mật (SECURITY)' },
               ]}
-              className="w-60"
+              className="w-full sm:w-60"
             />
           </div>
 
@@ -276,7 +276,7 @@ export default function AuditPage() {
       {activeTab === 'login_history' && (
         <div className="space-y-4">
           <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-            <SearchBar value={loginSearch} onChange={setLoginSearch} placeholder="Tìm theo email, IP..." className="w-80" />
+            <SearchBar value={loginSearch} onChange={setLoginSearch} placeholder="Tìm theo email, IP..." className="w-full sm:w-80" />
           </div>
 
           <Table columns={loginColumns} data={logins} loading={loginLoading} />
@@ -319,7 +319,7 @@ export default function AuditPage() {
 
           {/* Blocked IP Table */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
                 <Ban className="w-4 h-4 text-amber-400" /> Danh sách địa chỉ IP bị chặn (IP Blocklist)
               </h3>

@@ -150,15 +150,15 @@ export default function DashboardPage() {
         <div className="divide-y divide-slate-700/60">
           {stats?.recent_activity && stats.recent_activity.length > 0 ? (
             stats.recent_activity.slice(0, 10).map((item) => (
-              <div key={item.id} className="py-3 flex items-center justify-between gap-4 text-xs">
-                <div className="flex items-center gap-3">
-                  <Badge variant={item.action_type === 'SECURITY' ? 'danger' : 'info'}>
+              <div key={item.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Badge variant={item.action_type === 'SECURITY' ? 'danger' : 'info'} className="shrink-0">
                     {item.action_type || 'SYSTEM'}
                   </Badge>
-                  <div>
+                  <div className="min-w-0">
                     <span className="font-semibold text-slate-200">{item.user_email}</span>{' '}
                     <span className="text-slate-400">{item.action_name}</span>{' '}
-                    {item.target && <span className="text-sky-400 font-mono">({item.target})</span>}
+                    {item.target && <span className="text-sky-400 font-mono truncate">({item.target})</span>}
                   </div>
                 </div>
 

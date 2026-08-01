@@ -50,7 +50,7 @@ export default function CouponsPage() {
       const res = await api.get<{ data: Coupon[] }>('/v1/admin/licenses/coupons');
       setCoupons(res.data || []);
     } catch (err) {
-      toast.error('Không thể tải danh sách Coupon');
+      toast.error('KhÃ´ng thá»ƒ táº£i danh sÃ¡ch Coupon');
     } finally {
       setLoading(false);
     }
@@ -71,11 +71,11 @@ export default function CouponsPage() {
     setSubmitting(true);
     try {
       await api.post('/v1/admin/licenses/coupons', form);
-      toast.success('Đã tạo Mã Giảm Giá mới');
+      toast.success('ÄÃ£ táº¡o MÃ£ Giáº£m GiÃ¡ má»›i');
       setIsOpen(false);
       fetchCoupons();
     } catch (err: any) {
-      toast.error(err.message || 'Tạo coupon thất bại');
+      toast.error(err.message || 'Táº¡o coupon tháº¥t báº¡i');
     } finally {
       setSubmitting(false);
     }
@@ -86,11 +86,11 @@ export default function CouponsPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/licenses/coupons/${deleteId}`);
-      toast.success('Đã xóa Coupon');
+      toast.success('ÄÃ£ xÃ³a Coupon');
       setDeleteId(null);
       fetchCoupons();
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi xóa coupon');
+      toast.error(err.message || 'Lá»—i khi xÃ³a coupon');
     } finally {
       setDeleting(false);
     }
@@ -98,12 +98,12 @@ export default function CouponsPage() {
 
   const handleCopy = async (code: string) => {
     const ok = await copyToClipboard(code);
-    if (ok) toast.success('Đã sao chép mã Coupon');
+    if (ok) toast.success('ÄÃ£ sao chÃ©p mÃ£ Coupon');
   };
 
   const columns: Column<Coupon>[] = [
     {
-      header: 'Mã Coupon',
+      header: 'MÃ£ Coupon',
       cell: (item) => (
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/20">
@@ -116,15 +116,15 @@ export default function CouponsPage() {
       ),
     },
     {
-      header: 'Giảm giá',
+      header: 'Giáº£m giÃ¡',
       cell: (item) => <Badge variant="warning">{item.discount_percent}%</Badge>,
     },
     {
-      header: 'Áp dụng cho gói',
-      cell: (item) => <span className="text-xs text-slate-300">{item.plan_name || 'Tất cả các gói'}</span>,
+      header: 'Ãp dá»¥ng cho gÃ³i',
+      cell: (item) => <span className="text-xs text-slate-300">{item.plan_name || 'Táº¥t cáº£ cÃ¡c gÃ³i'}</span>,
     },
     {
-      header: 'Lượt dùng',
+      header: 'LÆ°á»£t dÃ¹ng',
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.used_count}/{item.max_uses}
@@ -132,16 +132,16 @@ export default function CouponsPage() {
       ),
     },
     {
-      header: 'Trạng thái',
+      header: 'Tráº¡ng thÃ¡i',
       cell: (item) =>
-        item.active ? <Badge variant="success">Hoạt động</Badge> : <Badge variant="danger">Đã khóa</Badge>,
+        item.active ? <Badge variant="success">Hoáº¡t Ä‘á»™ng</Badge> : <Badge variant="danger">ÄÃ£ khÃ³a</Badge>,
     },
     {
-      header: 'Hạn dùng',
+      header: 'Háº¡n dÃ¹ng',
       cell: (item) => <span className="text-xs text-slate-400">{formatDateShort(item.expires_at)}</span>,
     },
     {
-      header: 'Hành động',
+      header: 'HÃ nh Ä‘á»™ng',
       cell: (item) => (
         <Button
           variant="ghost"
@@ -150,7 +150,7 @@ export default function CouponsPage() {
           className="text-rose-400 hover:bg-rose-500/10"
           icon={<Trash2 className="w-3.5 h-3.5" />}
         >
-          Xóa
+          XÃ³a
         </Button>
       ),
     },
@@ -161,9 +161,9 @@ export default function CouponsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Tag className="w-5 h-5 text-amber-400" /> Quản lý Mã Giảm Giá (Coupons)
+            <Tag className="w-5 h-5 text-amber-400" /> Quáº£n lÃ½ MÃ£ Giáº£m GiÃ¡ (Coupons)
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">Tạo các chương trình khuyến mãi và ưu đãi cho người dùng</p>
+          <p className="text-xs text-slate-400 mt-0.5">Táº¡o cÃ¡c chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i vÃ  Æ°u Ä‘Ã£i cho ngÆ°á»i dÃ¹ng</p>
         </div>
 
         <Button
@@ -175,7 +175,7 @@ export default function CouponsPage() {
           }}
           icon={<Plus className="w-4 h-4" />}
         >
-          Tạo Coupon mới
+          Táº¡o Coupon má»›i
         </Button>
       </div>
 
@@ -185,21 +185,21 @@ export default function CouponsPage() {
       <Modal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        title="Tạo Mã Giảm Giá mới"
+        title="Táº¡o MÃ£ Giáº£m GiÃ¡ má»›i"
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
-              Hủy
+              Há»§y
             </Button>
             <Button variant="primary" size="sm" onClick={handleCreate} isLoading={submitting}>
-              Tạo Coupon
+              Táº¡o Coupon
             </Button>
           </>
         }
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <Input
-            label="Mã Coupon"
+            label="MÃ£ Coupon"
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
             rightElement={
@@ -214,9 +214,9 @@ export default function CouponsPage() {
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Tỷ lệ giảm giá (%)"
+              label="Tá»· lá»‡ giáº£m giÃ¡ (%)"
               type="number"
               min={1}
               max={100}
@@ -225,7 +225,7 @@ export default function CouponsPage() {
               required
             />
             <Input
-              label="Số lượt dùng tối đa"
+              label="Sá»‘ lÆ°á»£t dÃ¹ng tá»‘i Ä‘a"
               type="number"
               value={form.max_uses}
               onChange={(e) => setForm({ ...form, max_uses: parseInt(e.target.value) || 1 })}
@@ -234,17 +234,17 @@ export default function CouponsPage() {
           </div>
 
           <Select
-            label="Gói cước áp dụng"
+            label="GÃ³i cÆ°á»›c Ã¡p dá»¥ng"
             value={form.plan_id}
             onChange={(e) => setForm({ ...form, plan_id: e.target.value })}
             options={[
-              { value: '', label: 'Tất cả gói cước' },
+              { value: '', label: 'Táº¥t cáº£ gÃ³i cÆ°á»›c' },
               ...plans.map((p) => ({ value: p.id, label: p.name })),
             ]}
           />
 
           <Input
-            label="Hạn sử dụng"
+            label="Háº¡n sá»­ dá»¥ng"
             type="date"
             value={form.expires_at}
             onChange={(e) => setForm({ ...form, expires_at: e.target.value })}
@@ -259,8 +259,8 @@ export default function CouponsPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         isLoading={deleting}
-        title="Xóa Coupon"
-        message="Bạn có chắc chắn muốn xóa mã giảm giá này?"
+        title="XÃ³a Coupon"
+        message="Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a mÃ£ giáº£m giÃ¡ nÃ y?"
       />
     </div>
   );

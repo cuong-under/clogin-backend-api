@@ -43,7 +43,7 @@ export default function CommunicationPage() {
       const res = await api.get<{ data: Announcement[] }>('/v1/admin/announcements');
       setAnnouncements(res.data || []);
     } catch (err) {
-      toast.error('Không thể tải danh sách thông báo');
+      toast.error('KhÃ´ng thá»ƒ táº£i danh sÃ¡ch thÃ´ng bÃ¡o');
     } finally {
       setLoading(false);
     }
@@ -87,15 +87,15 @@ export default function CommunicationPage() {
     try {
       if (editingItem) {
         await api.put(`/v1/admin/announcements/${editingItem.id}`, form);
-        toast.success('Đã cập nhật thông báo');
+        toast.success('ÄÃ£ cáº­p nháº­t thÃ´ng bÃ¡o');
       } else {
         await api.post('/v1/admin/announcements', form);
-        toast.success('Đã phát thông báo mới');
+        toast.success('ÄÃ£ phÃ¡t thÃ´ng bÃ¡o má»›i');
       }
       setIsOpen(false);
       fetchAnnouncements();
     } catch (err: any) {
-      toast.error(err.message || 'Thao tác thất bại');
+      toast.error(err.message || 'Thao tÃ¡c tháº¥t báº¡i');
     } finally {
       setSubmitting(false);
     }
@@ -104,10 +104,10 @@ export default function CommunicationPage() {
   const handleToggleActive = async (item: Announcement) => {
     try {
       await api.put(`/v1/admin/announcements/${item.id}`, { active: !item.active });
-      toast.success(`Đã ${!item.active ? 'bật' : 'tắt'} thông báo`);
+      toast.success(`ÄÃ£ ${!item.active ? 'báº­t' : 'táº¯t'} thÃ´ng bÃ¡o`);
       fetchAnnouncements();
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi cập nhật');
+      toast.error(err.message || 'Lá»—i cáº­p nháº­t');
     }
   };
 
@@ -116,11 +116,11 @@ export default function CommunicationPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/announcements/${deleteId}`);
-      toast.success('Đã xóa thông báo');
+      toast.success('ÄÃ£ xÃ³a thÃ´ng bÃ¡o');
       setDeleteId(null);
       fetchAnnouncements();
     } catch (err: any) {
-      toast.error(err.message || 'Xóa thất bại');
+      toast.error(err.message || 'XÃ³a tháº¥t báº¡i');
     } finally {
       setDeleting(false);
     }
@@ -129,11 +129,11 @@ export default function CommunicationPage() {
   const getTypeBadge = (type: AnnouncementType) => {
     switch (type) {
       case 'info':
-        return <Badge variant="info">Thông tin</Badge>;
+        return <Badge variant="info">ThÃ´ng tin</Badge>;
       case 'warning':
-        return <Badge variant="warning">Cảnh báo</Badge>;
+        return <Badge variant="warning">Cáº£nh bÃ¡o</Badge>;
       case 'critical':
-        return <Badge variant="danger">Quan trọng</Badge>;
+        return <Badge variant="danger">Quan trá»ng</Badge>;
       default:
         return <Badge variant="default">{type}</Badge>;
     }
@@ -141,7 +141,7 @@ export default function CommunicationPage() {
 
   const columns: Column<Announcement>[] = [
     {
-      header: 'Tiêu đề thông báo',
+      header: 'TiÃªu Ä‘á» thÃ´ng bÃ¡o',
       cell: (item) => (
         <div>
           <span className="font-semibold text-slate-100 block text-sm">{item.title}</span>
@@ -150,19 +150,19 @@ export default function CommunicationPage() {
       ),
     },
     {
-      header: 'Loại',
+      header: 'Loáº¡i',
       cell: (item) => getTypeBadge(item.type),
     },
     {
-      header: 'Đối tượng nhận',
+      header: 'Äá»‘i tÆ°á»£ng nháº­n',
       cell: (item) => (
         <span className="text-xs uppercase font-semibold text-sky-400">
-          {item.target === 'all' ? 'Tất cả' : item.target}
+          {item.target === 'all' ? 'Táº¥t cáº£' : item.target}
         </span>
       ),
     },
     {
-      header: 'Thời gian phát',
+      header: 'Thá»i gian phÃ¡t',
       cell: (item) => (
         <span className="text-xs text-slate-400">
           {formatDateShort(item.start_date)} - {formatDateShort(item.end_date)}
@@ -170,27 +170,27 @@ export default function CommunicationPage() {
       ),
     },
     {
-      header: 'Trạng thái',
+      header: 'Tráº¡ng thÃ¡i',
       cell: (item) => (
         <button onClick={() => handleToggleActive(item)} className="cursor-pointer">
           {item.active ? (
             <Badge variant="success" className="gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Đang hiển thị
+              <CheckCircle2 className="w-3 h-3" /> Äang hiá»ƒn thá»‹
             </Badge>
           ) : (
             <Badge variant="danger" className="gap-1">
-              <XCircle className="w-3 h-3" /> Tắt
+              <XCircle className="w-3 h-3" /> Táº¯t
             </Badge>
           )}
         </button>
       ),
     },
     {
-      header: 'Hành động',
+      header: 'HÃ nh Ä‘á»™ng',
       cell: (item) => (
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(item)} icon={<Edit2 className="w-3.5 h-3.5" />}>
-            Sửa
+            Sá»­a
           </Button>
           <Button
             variant="ghost"
@@ -199,7 +199,7 @@ export default function CommunicationPage() {
             className="text-rose-400 hover:bg-rose-500/10"
             icon={<Trash2 className="w-3.5 h-3.5" />}
           >
-            Xóa
+            XÃ³a
           </Button>
         </div>
       ),
@@ -211,13 +211,13 @@ export default function CommunicationPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <Megaphone className="w-5 h-5 text-sky-400" /> Quản lý Thông Báo (Communication)
+            <Megaphone className="w-5 h-5 text-sky-400" /> Quáº£n lÃ½ ThÃ´ng BÃ¡o (Communication)
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">Gửi thông báo broadcast tới ứng dụng Desktop của người dùng</p>
+          <p className="text-xs text-slate-400 mt-0.5">Gá»­i thÃ´ng bÃ¡o broadcast tá»›i á»©ng dá»¥ng Desktop cá»§a ngÆ°á»i dÃ¹ng</p>
         </div>
 
         <Button variant="primary" size="sm" onClick={handleOpenCreate} icon={<Plus className="w-4 h-4" />}>
-          Tạo Thông báo mới
+          Táº¡o ThÃ´ng bÃ¡o má»›i
         </Button>
       </div>
 
@@ -227,61 +227,61 @@ export default function CommunicationPage() {
       <Modal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        title={editingItem ? 'Chỉnh sửa Thông báo' : 'Tạo Thông báo Broadcast mới'}
+        title={editingItem ? 'Chá»‰nh sá»­a ThÃ´ng bÃ¡o' : 'Táº¡o ThÃ´ng bÃ¡o Broadcast má»›i'}
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
-              Hủy
+              Há»§y
             </Button>
             <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={submitting}>
-              Phát thông báo
+              PhÃ¡t thÃ´ng bÃ¡o
             </Button>
           </>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Tiêu đề thông báo"
-            placeholder="VD: Bảo trì hệ thống Cloud Storage"
+            label="TiÃªu Ä‘á» thÃ´ng bÃ¡o"
+            placeholder="VD: Báº£o trÃ¬ há»‡ thá»‘ng Cloud Storage"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
-              label="Mức độ thông báo"
+              label="Má»©c Ä‘á»™ thÃ´ng bÃ¡o"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as AnnouncementType })}
               options={[
-                { value: 'info', label: 'Thông tin (Xanh)' },
-                { value: 'warning', label: 'Cảnh báo (Vàng)' },
-                { value: 'critical', label: 'Quan trọng (Đỏ)' },
+                { value: 'info', label: 'ThÃ´ng tin (Xanh)' },
+                { value: 'warning', label: 'Cáº£nh bÃ¡o (VÃ ng)' },
+                { value: 'critical', label: 'Quan trá»ng (Äá»)' },
               ]}
             />
 
             <Select
-              label="Đối tượng hiển thị"
+              label="Äá»‘i tÆ°á»£ng hiá»ƒn thá»‹"
               value={form.target}
               onChange={(e) => setForm({ ...form, target: e.target.value as any })}
               options={[
-                { value: 'all', label: 'Tất cả ứng dụng' },
-                { value: 'owners', label: 'Chỉ Owners' },
-                { value: 'workers', label: 'Chỉ Workers' },
+                { value: 'all', label: 'Táº¥t cáº£ á»©ng dá»¥ng' },
+                { value: 'owners', label: 'Chá»‰ Owners' },
+                { value: 'workers', label: 'Chá»‰ Workers' },
               ]}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Ngày bắt đầu"
+              label="NgÃ y báº¯t Ä‘áº§u"
               type="date"
               value={form.start_date}
               onChange={(e) => setForm({ ...form, start_date: e.target.value })}
               required
             />
             <Input
-              label="Ngày kết thúc"
+              label="NgÃ y káº¿t thÃºc"
               type="date"
               value={form.end_date}
               onChange={(e) => setForm({ ...form, end_date: e.target.value })}
@@ -290,10 +290,10 @@ export default function CommunicationPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">Nội dung chi tiết</label>
+            <label className="block text-xs font-medium text-slate-300">Ná»™i dung chi tiáº¿t</label>
             <textarea
               className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-400 h-28"
-              placeholder="Nhập nội dung thông báo..."
+              placeholder="Nháº­p ná»™i dung thÃ´ng bÃ¡o..."
               value={form.body}
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               required
@@ -307,8 +307,8 @@ export default function CommunicationPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         isLoading={deleting}
-        title="Xóa Thông báo"
-        message="Bạn có chắc chắn muốn xóa thông báo này?"
+        title="XÃ³a ThÃ´ng bÃ¡o"
+        message="Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a thÃ´ng bÃ¡o nÃ y?"
       />
     </div>
   );

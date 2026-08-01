@@ -19,7 +19,7 @@ export interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className }) => {
   return (
-    <div className={cn('flex border-b border-slate-700 space-x-1', className)}>
+    <div className={cn('flex border-b border-slate-700 space-x-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}>
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (
@@ -27,7 +27,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className
             key={tab.id}
             onClick={() => onChange(tab.id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer -mb-px',
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all cursor-pointer -mb-px whitespace-nowrap shrink-0',
               isActive
                 ? 'border-sky-400 text-sky-400 font-semibold'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'

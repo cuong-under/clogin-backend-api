@@ -14,9 +14,15 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CloginLogo } from '../ui/CloginLogo';
+
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
 
 interface NavItem {
   label: string;
@@ -25,7 +31,7 @@ interface NavItem {
   children?: { label: string; href: string }[];
 }
 
-export const Sidebar: React.FC = () => {
+export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose }) => {
   const pathname = usePathname();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     Licenses: true,
@@ -115,20 +121,38 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-64 bg-[#0a202a] border-r border-[#194354] flex flex-col h-screen sticky top-0 shrink-0 select-none">
-      {/* Brand Header */}
-      <div className="h-16 flex items-center gap-3 px-5 border-b border-[#194354] bg-[#07151c]">
-        <CloginLogo size={30} />
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-extrabold text-base tracking-wider brand-gradient-text">CLOGIN</span>
-            <span className="text-xs font-semibold text-[#00f0ff] px-1.5 py-0.5 rounded bg-[#00f0ff]/10 border border-[#00f0ff]/30">
-              PORTAL
-            </span>
+    <>
+      {/* Mobile overlay */}
+      <div
+        className={`fixed inset-0 bg-[#05161e]/70 backdrop-blur-sm z-40 lg:hidden transition-opacity ${
+          mobileOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onClose}
+      />
+      <aside className={cn(
+        'w-64 bg-[#0a202a] border-r border-[#194354] flex flex-col h-screen sticky top-0 shrink-0 select-none z-50 transition-transform duration-200',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      )}>
+        {/* Brand Header */}
+        <div className="h-16 flex items-center gap-3 px-5 border-b border-[#194354] bg-[#07151c]">
+          <CloginLogo size={30} />
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-base tracking-wider brand-gradient-text">CLOGIN</span>
+              <span className="text-xs font-semibold text-[#00f0ff] px-1.5 py-0.5 rounded bg-[#00f0ff]/10 border border-[#00f0ff]/30">
+                PORTAL
+              </span>
+            </div>
+            <p className="text-[11px] text-[#6b9eb3] font-medium">Antidetect Studio Admin</p>
           </div>
-          <p className="text-[11px] text-[#6b9eb3] font-medium">Antidetect Studio Admin</p>
+          <button
+            onClick={onClose}
+            className="ml-auto p-1.5 rounded-lg text-[#6b9eb3] hover:text-white hover:bg-[#112b38] lg:hidden"
+            aria-label="Đóng menu"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-      </div>
 
       {/* Nav list */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
@@ -223,6 +247,7 @@ export const Sidebar: React.FC = () => {
           <span className="w-2 h-2 rounded-full bg-[#00ffb7] animate-pulse shadow-sm shadow-[#00ffb7]" /> Live
         </span>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

@@ -59,23 +59,23 @@ export const Modal: React.FC<ModalProps> = ({
         )}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#194354] bg-[#07151c]/80">
-            <div>
+          <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-[#194354] bg-[#07151c]/80">
+            <div className="min-w-0">
               <h3 className="text-lg font-extrabold text-white tracking-wide">{title}</h3>
               {description && <p className="text-xs text-[#6b9eb3] mt-0.5">{description}</p>}
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#6b9eb3] hover:text-[#00f0ff] hover:bg-[#112b38] transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-[#6b9eb3] hover:text-[#00f0ff] hover:bg-[#112b38] transition-colors cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         )}
 
-        <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">{children}</div>
+        <div className="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto">{children}</div>
 
-        {footer && <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#194354] bg-[#07151c]/60">{footer}</div>}
+        {footer && <div className="flex flex-wrap items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t border-[#194354] bg-[#07151c]/60">{footer}</div>}
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export function Table<T>({
         <thead className="bg-[#07151c] text-[11px] uppercase font-bold text-[#6b9eb3] border-b border-[#194354] tracking-wider">
           <tr>
             {selectable && (
-              <th className="p-3.5 w-10">
+              <th className="p-3 sm:p-3.5 w-10">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -55,7 +55,7 @@ export function Table<T>({
               </th>
             )}
             {columns.map((col, idx) => (
-              <th key={idx} className={cn('px-4 py-3.5 font-bold', col.className)}>
+              <th key={idx} className={cn('px-3 sm:px-4 py-3 font-bold', col.className)}>
                 {col.header}
               </th>
             ))}
@@ -89,7 +89,7 @@ export function Table<T>({
                   )}
                 >
                   {selectable && (
-                    <td className="p-3.5 w-10" onClick={(e) => e.stopPropagation()}>
+                    <td className="p-3 sm:p-3.5 w-10" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected}
@@ -99,7 +99,7 @@ export function Table<T>({
                     </td>
                   )}
                   {columns.map((col, colIdx) => (
-                    <td key={colIdx} className={cn('px-4 py-3.5 text-white font-medium', col.className)}>
+                    <td key={colIdx} className={cn('px-3 sm:px-4 py-3 text-white font-medium', col.className)}>
                       {col.cell
                         ? col.cell(item)
                         : col.accessorKey

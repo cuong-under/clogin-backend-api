@@ -219,7 +219,7 @@ export default function OwnersPage() {
       </div>
 
       <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60 flex items-center justify-between">
-        <SearchBar value={search} onChange={setSearch} placeholder="Tìm kiếm theo email, tên Owner..." className="w-80" />
+        <SearchBar value={search} onChange={setSearch} placeholder="Tìm kiếm theo email, tên Owner..." className="w-full sm:w-80" />
       </div>
 
       <Table columns={columns} data={owners} loading={loading} onRowClick={(item) => loadOwnerDetails(item)} />
@@ -266,7 +266,7 @@ export default function OwnersPage() {
           title={`Chi tiết tài khoản Owner: ${selectedOwner.email}`}
           maxWidth="4xl"
           footer={
-            <div className="flex items-center justify-between w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3">
               <Button
                 variant={selectedOwner.status === 'active' ? 'danger' : 'primary'}
                 size="sm"
@@ -282,7 +282,7 @@ export default function OwnersPage() {
         >
           <div className="space-y-6">
             {/* Overview */}
-            <div className="grid grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900 border border-slate-700 text-xs">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900 border border-slate-700 text-xs">
               <div>
                 <span className="text-slate-400 block">Tên:</span>
                 <span className="font-semibold text-slate-100 mt-1 block">{selectedOwner.name}</span>

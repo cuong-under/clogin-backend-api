@@ -42,7 +42,7 @@ export default function LicensePlansPage() {
       const res = await api.get<{ data: LicensePlan[] }>('/v1/admin/licenses/plans');
       setPlans(res.data || []);
     } catch (err) {
-      toast.error('Không thể tải danh sách gói cước');
+      toast.error('KhÃ´ng thá»ƒ táº£i danh sÃ¡ch gÃ³i cÆ°á»›c');
     } finally {
       setLoading(false);
     }
@@ -88,15 +88,15 @@ export default function LicensePlansPage() {
     try {
       if (editingPlan) {
         await api.put(`/v1/admin/licenses/plans/${editingPlan.id}`, form);
-        toast.success('Đã cập nhật gói cước');
+        toast.success('ÄÃ£ cáº­p nháº­t gÃ³i cÆ°á»›c');
       } else {
         await api.post('/v1/admin/licenses/plans', form);
-        toast.success('Đã tạo gói cước mới');
+        toast.success('ÄÃ£ táº¡o gÃ³i cÆ°á»›c má»›i');
       }
       setIsOpen(false);
       fetchPlans();
     } catch (err: any) {
-      toast.error(err.message || 'Thao tác thất bại');
+      toast.error(err.message || 'Thao tÃ¡c tháº¥t báº¡i');
     } finally {
       setSubmitting(false);
     }
@@ -107,11 +107,11 @@ export default function LicensePlansPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/licenses/plans/${deleteId}`);
-      toast.success('Đã xóa gói cước');
+      toast.success('ÄÃ£ xÃ³a gÃ³i cÆ°á»›c');
       setDeleteId(null);
       fetchPlans();
     } catch (err: any) {
-      toast.error(err.message || 'Lỗi khi xóa gói cước');
+      toast.error(err.message || 'Lá»—i khi xÃ³a gÃ³i cÆ°á»›c');
     } finally {
       setDeleting(false);
     }
@@ -120,16 +120,16 @@ export default function LicensePlansPage() {
   const handleToggleActive = async (plan: LicensePlan) => {
     try {
       await api.put(`/v1/admin/licenses/plans/${plan.id}`, { active: !plan.active });
-      toast.success(`Đã ${!plan.active ? 'kích hoạt' : 'ẩn'} gói cước ${plan.name}`);
+      toast.success(`ÄÃ£ ${!plan.active ? 'kÃ­ch hoáº¡t' : 'áº©n'} gÃ³i cÆ°á»›c ${plan.name}`);
       fetchPlans();
     } catch (err: any) {
-      toast.error(err.message || 'Không thể cập nhật trạng thái');
+      toast.error(err.message || 'KhÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i');
     }
   };
 
   const columns: Column<LicensePlan>[] = [
     {
-      header: 'Tên gói',
+      header: 'TÃªn gÃ³i',
       cell: (item) => (
         <div>
           <span className="font-semibold text-slate-100 block text-sm">{item.name}</span>
@@ -138,7 +138,7 @@ export default function LicensePlansPage() {
       ),
     },
     {
-      header: 'Giới hạn (Dev/Worker/Profile)',
+      header: 'Giá»›i háº¡n (Dev/Worker/Profile)',
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.max_devices} dev / {item.max_workers} worker / {item.max_profiles} profile
@@ -146,39 +146,39 @@ export default function LicensePlansPage() {
       ),
     },
     {
-      header: 'Giá cước',
+      header: 'GiÃ¡ cÆ°á»›c',
       cell: (item) => (
         <span className="text-xs font-semibold text-emerald-400">
-          {item.price > 0 ? `${item.price.toLocaleString('vi-VN')} VNĐ` : 'Miễn phí'}
+          {item.price > 0 ? `${item.price.toLocaleString('vi-VN')} VNÄ` : 'Miá»…n phÃ­'}
         </span>
       ),
     },
     {
-      header: 'Thời hạn',
-      cell: (item) => <span className="text-xs text-slate-300">{item.duration_days} ngày</span>,
+      header: 'Thá»i háº¡n',
+      cell: (item) => <span className="text-xs text-slate-300">{item.duration_days} ngÃ y</span>,
     },
     {
-      header: 'Trạng thái',
+      header: 'Tráº¡ng thÃ¡i',
       cell: (item) => (
         <button onClick={() => handleToggleActive(item)} className="cursor-pointer">
           {item.active ? (
             <Badge variant="success" className="gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Đang bán
+              <CheckCircle2 className="w-3 h-3" /> Äang bÃ¡n
             </Badge>
           ) : (
             <Badge variant="danger" className="gap-1">
-              <XCircle className="w-3 h-3" /> Đã ẩn
+              <XCircle className="w-3 h-3" /> ÄÃ£ áº©n
             </Badge>
           )}
         </button>
       ),
     },
     {
-      header: 'Hành động',
+      header: 'HÃ nh Ä‘á»™ng',
       cell: (item) => (
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(item)} icon={<Edit2 className="w-3.5 h-3.5" />}>
-            Sửa
+            Sá»­a
           </Button>
           <Button
             variant="ghost"
@@ -187,7 +187,7 @@ export default function LicensePlansPage() {
             className="text-rose-400 hover:bg-rose-500/10"
             icon={<Trash2 className="w-3.5 h-3.5" />}
           >
-            Xóa
+            XÃ³a
           </Button>
         </div>
       ),
@@ -198,12 +198,12 @@ export default function LicensePlansPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-slate-100">Gói Cước Bản Quyền (Plans)</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Cấu hình các gói đăng ký dịch vụ Clogin Studio</p>
+          <h1 className="text-xl font-bold text-slate-100">GÃ³i CÆ°á»›c Báº£n Quyá»n (Plans)</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Cáº¥u hÃ¬nh cÃ¡c gÃ³i Ä‘Äƒng kÃ½ dá»‹ch vá»¥ Clogin Studio</p>
         </div>
 
         <Button variant="primary" size="sm" onClick={handleOpenCreate} icon={<Plus className="w-4 h-4" />}>
-          Tạo Gói Cước mới
+          Táº¡o GÃ³i CÆ°á»›c má»›i
         </Button>
       </div>
 
@@ -213,29 +213,29 @@ export default function LicensePlansPage() {
       <Modal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        title={editingPlan ? 'Chỉnh sửa Gói Cước' : 'Tạo Gói Cước mới'}
+        title={editingPlan ? 'Chá»‰nh sá»­a GÃ³i CÆ°á»›c' : 'Táº¡o GÃ³i CÆ°á»›c má»›i'}
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
-              Hủy
+              Há»§y
             </Button>
             <Button variant="primary" size="sm" onClick={handleSubmit} isLoading={submitting}>
-              Lưu thay đổi
+              LÆ°u thay Ä‘á»•i
             </Button>
           </>
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Tên Gói (Name)"
+              label="TÃªn GÃ³i (Name)"
               placeholder="VD: Premium Team"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
             />
             <Input
-              label="Mã Slug"
+              label="MÃ£ Slug"
               placeholder="VD: premium-team"
               value={form.slug}
               onChange={(e) => setForm({ ...form, slug: e.target.value })}
@@ -243,7 +243,7 @@ export default function LicensePlansPage() {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
               label="Max Devices"
               type="number"
@@ -267,16 +267,16 @@ export default function LicensePlansPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="Giá cước (VNĐ)"
+              label="GiÃ¡ cÆ°á»›c (VNÄ)"
               type="number"
               value={form.price}
               onChange={(e) => setForm({ ...form, price: parseInt(e.target.value) || 0 })}
               required
             />
             <Input
-              label="Thời hạn (Số ngày)"
+              label="Thá»i háº¡n (Sá»‘ ngÃ y)"
               type="number"
               value={form.duration_days}
               onChange={(e) => setForm({ ...form, duration_days: parseInt(e.target.value) || 30 })}
@@ -292,8 +292,8 @@ export default function LicensePlansPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         isLoading={deleting}
-        title="Xóa Gói Cước"
-        message="Bạn có chắc chắn muốn xóa gói cước này? Thao tác không thể hoàn tác."
+        title="XÃ³a GÃ³i CÆ°á»›c"
+        message="Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a gÃ³i cÆ°á»›c nÃ y? Thao tÃ¡c khÃ´ng thá»ƒ hoÃ n tÃ¡c."
       />
     </div>
   );

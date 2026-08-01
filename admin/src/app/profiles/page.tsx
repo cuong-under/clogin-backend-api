@@ -175,7 +175,7 @@ export default function CloudProfilesPage() {
       </div>
 
       <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-        <SearchBar value={search} onChange={setSearch} placeholder="Tìm profile theo tên, folder..." className="w-80" />
+        <SearchBar value={search} onChange={setSearch} placeholder="Tìm profile theo tên, folder..." className="w-full sm:w-80" />
       </div>
 
       <Table columns={columns} data={profiles} loading={loading} onRowClick={(item) => setSelectedProfile(item)} />
@@ -218,7 +218,7 @@ export default function CloudProfilesPage() {
           title={`Chi tiết Profile: ${selectedProfile.name}`}
           maxWidth="2xl"
           footer={
-            <div className="flex items-center justify-between w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3">
               <Button variant="danger" size="sm" onClick={() => setDeleteId(selectedProfile.id)}>
                 Xóa Profile
               </Button>
