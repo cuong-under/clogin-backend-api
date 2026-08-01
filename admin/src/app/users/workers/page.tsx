@@ -112,10 +112,12 @@ export default function WorkersPage() {
     },
     {
       header: 'Đăng nhập cuối',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDate(item.last_login)}</span>,
     },
     {
       header: 'Ngày tạo',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDate(item.created_at)}</span>,
     },
     {

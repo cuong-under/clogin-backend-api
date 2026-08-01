@@ -139,6 +139,7 @@ export default function LicensePlansPage() {
     },
     {
       header: 'Giá»›i háº¡n (Dev/Worker/Profile)',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.max_devices} dev / {item.max_workers} worker / {item.max_profiles} profile
@@ -155,6 +156,7 @@ export default function LicensePlansPage() {
     },
     {
       header: 'Thá»i háº¡n',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-300">{item.duration_days} ngÃ y</span>,
     },
     {

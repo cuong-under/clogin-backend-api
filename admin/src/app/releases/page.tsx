@@ -120,6 +120,7 @@ export default function ReleasesPage() {
     },
     {
       header: 'Nháº­t kÃ½ thay Ä‘á»•i (Changelog)',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs text-slate-300 max-w-xs block truncate" title={item.changelog}>
           {truncateText(item.changelog, 60)}
@@ -128,6 +129,7 @@ export default function ReleasesPage() {
     },
     {
       header: 'NgÃ y phÃ¡t hÃ nh',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDateShort(item.published_at)}</span>,
     },
     {

@@ -138,6 +138,7 @@ export default function OwnersPage() {
     },
     {
       header: 'License Key',
+      hideOnMobile: true,
       cell: (item) =>
         item.license_key ? (
           <span className="font-mono text-xs text-sky-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-700">
@@ -149,6 +150,7 @@ export default function OwnersPage() {
     },
     {
       header: 'Workers',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.workers_count}/{item.max_workers}
@@ -157,10 +159,12 @@ export default function OwnersPage() {
     },
     {
       header: 'Profiles',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs font-mono">{item.profiles_count}</span>,
     },
     {
       header: 'Đăng nhập cuối',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDate(item.last_login)}</span>,
     },
     {

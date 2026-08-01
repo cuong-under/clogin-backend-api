@@ -22,7 +22,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   return (
     <div className="flex items-center justify-between px-2 py-3">
       {totalItems !== undefined ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 hidden sm:block">
           Hiển thị trang <span className="font-semibold text-slate-200">{page}</span> /{' '}
           <span className="font-semibold text-slate-200">{totalPages}</span> ({totalItems} kết quả)
         </p>

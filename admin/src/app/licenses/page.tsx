@@ -203,6 +203,7 @@ export default function LicensesPage() {
     },
     {
       header: 'Thiết bị',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.active_devices_count}/{item.max_devices}
@@ -211,10 +212,12 @@ export default function LicensesPage() {
     },
     {
       header: 'Trạng thái',
+      hideOnMobile: true,
       cell: (item) => getStatusBadge(item.status),
     },
     {
       header: 'Hạn dùng',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDateShort(item.valid_until)}</span>,
     },
     {

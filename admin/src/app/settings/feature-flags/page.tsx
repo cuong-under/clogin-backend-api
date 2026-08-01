@@ -133,6 +133,7 @@ export default function FeatureFlagsPage() {
     },
     {
       header: 'Áp dụng cho Plans',
+      hideOnMobile: true,
       cell: (item) =>
         item.target_plans && item.target_plans.length > 0 ? (
           <div className="flex flex-wrap gap-1">

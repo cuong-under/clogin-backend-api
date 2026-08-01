@@ -133,3 +133,20 @@
   color: var(--warn);
   border: 1px solid rgba(255, 183, 3, 0.3);
 }
+
+/* Mobile-friendly table: ensure minimum touch targets and truncation */
+@media (max-width: 767px) {
+  table td,
+  table th {
+    white-space: nowrap;
+  }
+
+  /* License key cells: truncate long mono text */
+  table .font-mono {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+  }
+}

@@ -117,10 +117,12 @@ export default function CloudProfilesPage() {
     },
     {
       header: 'Worker được gán',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs font-mono">{item.assigned_workers_count}</span>,
     },
     {
       header: 'Cookies',
+      hideOnMobile: true,
       cell: (item) =>
         item.has_cookies ? (
           <Badge variant="info" className="gap-1">
@@ -132,6 +134,7 @@ export default function CloudProfilesPage() {
     },
     {
       header: 'Cập nhật cuối',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDate(item.updated_at)}</span>,
     },
     {

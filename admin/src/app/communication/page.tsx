@@ -155,6 +155,7 @@ export default function CommunicationPage() {
     },
     {
       header: 'Äá»‘i tÆ°á»£ng nháº­n',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs uppercase font-semibold text-sky-400">
           {item.target === 'all' ? 'Táº¥t cáº£' : item.target}
@@ -163,6 +164,7 @@ export default function CommunicationPage() {
     },
     {
       header: 'Thá»i gian phÃ¡t',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs text-slate-400">
           {formatDateShort(item.start_date)} - {formatDateShort(item.end_date)}

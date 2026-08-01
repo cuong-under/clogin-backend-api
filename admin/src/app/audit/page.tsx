@@ -158,10 +158,12 @@ export default function AuditPage() {
     },
     {
       header: 'Đối tượng (Target)',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs font-mono text-slate-300">{item.target || '-'}</span>,
     },
     {
       header: 'IP Address',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs font-mono text-slate-400">{item.ip}</span>,
     },
   ];
@@ -182,6 +184,7 @@ export default function AuditPage() {
     },
     {
       header: 'Quốc gia',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{item.country || 'N/A'}</span>,
     },
     {
@@ -191,6 +194,7 @@ export default function AuditPage() {
     },
     {
       header: 'User Agent',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-[11px] text-slate-400 block max-w-xs truncate" title={item.user_agent}>
           {item.user_agent}

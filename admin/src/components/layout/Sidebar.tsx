@@ -130,7 +130,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
         onClick={onClose}
       />
       <aside className={cn(
-        'w-64 bg-[#0a202a] border-r border-[#194354] flex flex-col h-screen sticky top-0 shrink-0 select-none z-50 transition-transform duration-200',
+        'w-64 bg-[#0a202a] border-r border-[#194354] flex flex-col h-screen shrink-0 select-none z-50 transition-transform duration-200',
+        'fixed top-0 left-0 lg:sticky lg:top-0',
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
         {/* Brand Header */}

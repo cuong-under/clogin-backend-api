@@ -10,6 +10,8 @@ export interface Column<T> {
   accessorKey?: keyof T;
   cell?: (item: T) => React.ReactNode;
   className?: string;
+  /** Hide this column on screens smaller than md (< 768px) */
+  hideOnMobile?: boolean;
 }
 
 export interface TableProps<T> {
@@ -55,7 +57,7 @@ export function Table<T>({
               </th>
             )}
             {columns.map((col, idx) => (
-              <th key={idx} className={cn('px-3 sm:px-4 py-3 font-bold', col.className)}>
+              <th key={idx} className={cn('px-3 sm:px-4 py-3 font-bold', col.hideOnMobile && 'hidden md:table-cell', col.className)}>
                 {col.header}
               </th>
             ))}
@@ -99,7 +101,7 @@ export function Table<T>({
                     </td>
                   )}
                   {columns.map((col, colIdx) => (
-                    <td key={colIdx} className={cn('px-3 sm:px-4 py-3 text-white font-medium', col.className)}>
+                    <td key={colIdx} className={cn('px-3 sm:px-4 py-3 text-white font-medium', col.hideOnMobile && 'hidden md:table-cell', col.className)}>
                       {col.cell
                         ? col.cell(item)
                         : col.accessorKey

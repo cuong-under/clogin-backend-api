@@ -121,10 +121,12 @@ export default function CouponsPage() {
     },
     {
       header: 'Ãp dá»¥ng cho gÃ³i',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-300">{item.plan_name || 'Táº¥t cáº£ cÃ¡c gÃ³i'}</span>,
     },
     {
       header: 'LÆ°á»£t dÃ¹ng',
+      hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs font-mono">
           {item.used_count}/{item.max_uses}
@@ -138,6 +140,7 @@ export default function CouponsPage() {
     },
     {
       header: 'Háº¡n dÃ¹ng',
+      hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDateShort(item.expires_at)}</span>,
     },
     {
