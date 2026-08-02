@@ -196,7 +196,7 @@ class ReleaseService {
       throw {
         statusCode: 400,
         code: 'GITHUB_TOKEN_REQUIRED',
-        message: 'Cần cấu hình GitHub Token trong Releases > Đồng bộ Upstream để Portal tự build release'
+        message: 'Chưa có GitHub Token cho Portal. Vào Releases > Đồng bộ Upstream, dán fine-grained token có Contents: Read and write và Actions: Read and write, sau đó bấm Lưu cấu hình.'
       };
     }
     const signing = await this.getUpdaterSigningStatus();
@@ -227,7 +227,16 @@ class ReleaseService {
       throw { statusCode: 502, code: 'GITHUB_API_ERROR', message: detail.message || 'Không thể kiểm tra tag GitHub' };
     }
 
-    const branchRef = await this.githubRequest(`/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`);
+    const branchRef = await this.githubRequest(`/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`).catch((error) => {
+      if (error.statusCode === 502) {
+        throw {
+          statusCode: 400,
+          code: 'RELEASE_BRANCH_NOT_FOUND',
+          message: `Không tìm thấy nhánh phát hành "${branch}" trên ${repository}. Vào Releases > Đồng bộ Upstream để sửa Release Branch.`
+        };
+      }
+      throw error;
+    });
     const baseCommitSha = (await branchRef.json()).object.sha;
     const baseCommit = await this.githubRequest(`/repos/${repository}/git/commits/${baseCommitSha}`);
     const baseTreeSha = (await baseCommit.json()).tree.sha;
