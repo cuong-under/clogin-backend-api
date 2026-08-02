@@ -310,6 +310,62 @@ async function runMigration() {
     console.log('[Migration] Audit logs migrated successfully.');
   }
 
+  // 7. Phase 1: idempotent Default Workspace backfill for each Owner.
+  const { PRESET_CAPABILITIES } = require('./config/capabilities');
+  const OPERATOR_CAPS = PRESET_CAPABILITIES.operator;
+  console.log('[Migration] Backfilling default workspaces (idempotent)...');
+  const owners = await prisma.owner.findMany({
+    include: { workers: true, profiles: true }
+  });
+  for (const owner of owners) {
+    let ws = await prisma.workspace.findFirst({
+      where: { owner_id: owner.id, name: 'Default Workspace' }
+    });
+    if (!ws) {
+      ws = await prisma.workspace.create({
+        data: {
+          owner_id: owner.id,
+          name: 'Default Workspace',
+          description: 'Workspace mặc định dành cho mọi thành viên',
+          policy_revision: 1
+        }
+      });
+      console.log(`[Backfill] Created Default Workspace for ${owner.email || owner.id}`);
+    }
+
+    // Add every existing worker as an active Operator member (idempotent).
+    for (const worker of owner.workers) {
+      await prisma.workspaceMember.upsert({
+        where: {
+          workspace_id_worker_id: { workspace_id: ws.id, worker_id: worker.id }
+        },
+        update: {},
+        create: {
+          workspace_id: ws.id,
+          worker_id: worker.id,
+          preset_role: 'operator',
+          capabilities: OPERATOR_CAPS,
+          active: true
+        }
+      });
+    }
+
+    // Add every existing CloudProfile to the workspace (idempotent).
+    for (const profile of owner.profiles) {
+      await prisma.workspaceProfile.upsert({
+        where: {
+          workspace_id_profile_id: { workspace_id: ws.id, profile_id: profile.id }
+        },
+        update: {},
+        create: {
+          workspace_id: ws.id,
+          profile_id: profile.id
+        }
+      });
+    }
+  }
+  console.log('[Backfill] Default workspace mapping complete.');
+
   console.log('--- Migration & Seeding Completed Successfully ---');
 }
 

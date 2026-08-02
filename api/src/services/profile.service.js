@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 class ProfileService {
-  async syncCloudProfile(ownerId, { profile_id, name, folder = '', config = {}, assigned_worker_ids = [] }) {
+  async syncCloudProfile(ownerId, { profile_id, name, folder = '', config = {}, assigned_worker_ids = [], revision: expectedRevision, idempotency_key }) {
     if (!profile_id || !name) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu profile_id hoặc name' };
     }
@@ -10,6 +10,18 @@ class ProfileService {
     const existing = await prisma.cloudProfile.findUnique({
       where: { id: profile_id }
     });
+
+    // Stale revision conflict: never silently overwrite a newer Cloud revision.
+    if (existing && existing.owner_id === ownerId && expectedRevision !== undefined && existing.sync_revision > expectedRevision) {
+      throw {
+        statusCode: 409,
+        code: 'SYNC_CONFLICT',
+        message: 'Cloud đã có revision mới hơn. Cần refresh trước khi sync.',
+        canonical_revision: existing.sync_revision
+      };
+    }
+
+    const newRevision = existing ? Math.max((expectedRevision || 0), existing.sync_revision) + 1 : (expectedRevision || 1);
 
     if (existing) {
       if (existing.owner_id !== ownerId) {
@@ -21,7 +33,9 @@ class ProfileService {
           name,
           folder: folder || existing.folder,
           config: config || existing.config,
-          assigned_worker_ids: assigned_worker_ids || existing.assigned_worker_ids,
+          assigned_worker_ids: assigned_worker_ids !== undefined ? assigned_worker_ids : existing.assigned_worker_ids,
+          sync_revision: newRevision,
+          sync_state: 'synced',
           updated_at: new Date()
         }
       });
@@ -34,12 +48,14 @@ class ProfileService {
           folder: folder || '',
           config: config || {},
           assigned_worker_ids: assigned_worker_ids || [],
-          cookies: null
+          cookies: null,
+          sync_revision: newRevision,
+          sync_state: 'synced'
         }
       });
     }
 
-    return { success: true };
+    return { success: true, sync_revision: newRevision };
   }
 
   async getCloudProfiles(payload) {
@@ -106,8 +122,33 @@ class ProfileService {
       throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy profile' };
     }
 
-    await prisma.cloudProfile.delete({ where: { id: profileId } });
+    await prisma.cloudProfile.update({
+      where: { id: profileId },
+      data: { sync_state: 'deleted', updated_at: new Date() }
+    });
+    await prisma.cloudProfile.delete({ where: { id: profileId } }).catch(() => {});
     return { success: true };
+  }
+
+  async getCloudProfileSyncStatus(payload, profileId) {
+    const profile = await prisma.cloudProfile.findUnique({
+      where: { id: profileId }
+    });
+    if (!profile) {
+      throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy profile' };
+    }
+    if (payload.type === 'owner' && profile.owner_id !== payload.sub) {
+      throw { statusCode: 403, code: 'FORBIDDEN', message: 'Không phải profile của bạn' };
+    }
+    if (payload.type === 'worker' && (!profile.assigned_worker_ids || !profile.assigned_worker_ids.includes(payload.sub))) {
+      throw { statusCode: 403, code: 'FORBIDDEN', message: 'Bạn chưa được gán profile này' };
+    }
+    return {
+      profile_id: profile.id,
+      sync_revision: profile.sync_revision,
+      sync_state: profile.sync_state,
+      updated_at: profile.updated_at.toISOString()
+    };
   }
 
   async assignCloudProfile(ownerId, profileId, workerIds = []) {

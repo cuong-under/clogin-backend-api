@@ -100,4 +100,33 @@ router.delete('/cloud/:id', authMw, requireOwner, async (req, res, next) => {
   }
 });
 
+// Phase 1/2: revision-aware outbox sync surface (kept compatible with the
+// existing POST /cloud/sync for older clients).
+router.put('/cloud/:id/sync', authMw, requireOwner, async (req, res, next) => {
+  try {
+    const result = await profileService.syncCloudProfile(req.owner.id, {
+      ...req.body,
+      profile_id: req.params.id
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) {
+      return sendError(res, err.statusCode, err.code, err.message);
+    }
+    next(err);
+  }
+});
+
+router.get('/cloud/:id/sync-status', authMw, async (req, res, next) => {
+  try {
+    const result = await profileService.getCloudProfileSyncStatus(req.user, req.params.id);
+    return res.status(200).json(result);
+  } catch (err) {
+    if (err.statusCode) {
+      return sendError(res, err.statusCode, err.code, err.message);
+    }
+    next(err);
+  }
+});
+
 module.exports = router;

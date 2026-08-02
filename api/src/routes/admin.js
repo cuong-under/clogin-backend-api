@@ -443,6 +443,103 @@ router.delete(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin'
 
 // ==================== PROFILES ====================
 
+router.get('/workspaces', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const { page = 1, perPage = 20, search } = req.query;
+    const skip = (page - 1) * perPage;
+    const where = search ? { name: { contains: search, mode: 'insensitive' } } : {};
+    const [rows, total] = await Promise.all([
+      prisma.workspace.findMany({
+        where,
+        include: {
+          owner: { select: { id: true, email: true, name: true } },
+          _count: { select: { members: true, profiles: true, tasks: true, auditEvents: true, sops: true } }
+        },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: perPage
+      }),
+      prisma.workspace.count({ where })
+    ]);
+    const workspaces = rows.map(w => ({
+      id: w.id,
+      name: w.name,
+      description: w.description,
+      owner_id: w.owner_id,
+      owner_email: w.owner ? w.owner.email : '',
+      policy_revision: w.policy_revision,
+      archived: !!w.archived_at,
+      member_count: w._count.members,
+      profile_count: w._count.profiles,
+      task_count: w._count.tasks,
+      audit_count: w._count.auditEvents,
+      sop_count: w._count.sops,
+      created_at: w.created_at.toISOString(),
+      updated_at: w.updated_at.toISOString()
+    }));
+    return res.status(200).json({ data: workspaces, workspaces, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/workspaces/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const ws = await prisma.workspace.findUnique({
+      where: { id: req.params.id },
+      include: {
+        owner: { select: { id: true, email: true } },
+        members: { include: { worker: { select: { id: true, email: true, name: true } } } },
+        _count: { select: { profiles: true, tasks: true, auditEvents: true, sops: true } }
+      }
+    });
+    if (!ws) return sendError(res, 404, 'NOT_FOUND', 'Workspace không tồn tại');
+    return res.status(200).json({
+      workspace: {
+        id: ws.id,
+        name: ws.name,
+        owner_email: ws.owner.email,
+        policy_revision: ws.policy_revision,
+        archived: !!ws.archived_at,
+        member_count: ws._count.members,
+        profile_count: ws._count.profiles,
+        task_count: ws._count.tasks,
+        audit_count: ws._count.auditEvents,
+        sop_count: ws._count.sops,
+        members: ws.members.map(m => ({
+          worker_id: m.worker_id,
+          email: m.worker.email,
+          name: m.worker.name,
+          preset_role: m.preset_role,
+          capabilities: m.capabilities,
+          active: m.active
+        }))
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/migration/status', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const owners = await prisma.owner.findMany({ select: { id: true, email: true } });
+    const rows = [];
+    for (const o of owners) {
+      const ws = await prisma.workspace.findFirst({ where: { owner_id: o.id } });
+      rows.push({
+        owner_id: o.id,
+        owner_email: o.email,
+        has_default_workspace: !!ws,
+        migration_complete: !!ws
+      });
+    }
+    return res.status(200).json({ data: rows, migration: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/profiles', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const { page, perPage } = parsePagination(req.query);

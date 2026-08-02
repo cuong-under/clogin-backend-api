@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CloginLogo } from '../ui/CloginLogo';
@@ -83,6 +84,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onClose })
           label: 'Cloud Profiles',
           href: '/profiles',
           icon: <FolderGit2 className="w-4 h-4" />,
+        },
+        {
+          label: 'Workspaces & Task',
+          href: '/workspaces',
+          icon: <Layers className="w-4 h-4" />,
         },
       ],
     },

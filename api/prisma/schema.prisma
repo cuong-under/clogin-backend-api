@@ -103,6 +103,7 @@ model Owner {
   workers          Worker[]
   profiles         CloudProfile[]
   audit_logs       AuditLog[]
+  workspaces       Workspace[]
   @@index([email])
   @@map("owners")
 }
@@ -119,6 +120,8 @@ model Worker {
   last_login_ip  String?
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
+  workspaceMembers   WorkspaceMember[]
+  profileAssignments WorkspaceProfileAssignment[]
   @@unique([owner_id, email])
   @@index([email])
   @@map("workers")
@@ -133,8 +136,11 @@ model CloudProfile {
   config              Json      @default("{}")
   cookies             Json?
   assigned_worker_ids String[]  @default([])
+  sync_revision       Int       @default(0)
+  sync_state          String    @default("pending")
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
+  workspaceProfiles   WorkspaceProfile[]
   @@index([owner_id])
   @@map("cloud_profiles")
 }
@@ -249,4 +255,211 @@ model IpBlock {
   expires_at DateTime?
   created_at DateTime  @default(now())
   @@map("ip_blocks")
+}
+
+enum WorkspacePresetRole {
+  operator
+  manager
+  auditor
+}
+
+enum TaskPriority {
+  low
+  medium
+  high
+  urgent
+}
+
+enum TaskStatus {
+  todo
+  in_progress
+  blocked
+  done
+  cancelled
+}
+
+enum AiActionClass {
+  read
+  write
+  destructive
+  sensitive
+}
+
+model Workspace {
+  id              String    @id @default(uuid())
+  owner_id        String
+  owner           Owner     @relation(fields: [owner_id], references: [id], onDelete: Cascade)
+  name            String
+  description     String    @default("")
+  archived_at     DateTime?
+  policy_revision Int       @default(1)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  members         WorkspaceMember[]
+  profiles        WorkspaceProfile[]
+  sops            SopTemplate[]
+  tasks           WorkspaceTask[]
+  auditEvents     WorkspaceAuditEvent[]
+  vaultEntries    ProxyVaultEntry[]
+  @@index([owner_id])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id             String               @id @default(uuid())
+  workspace_id   String
+  workspace      Workspace            @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  worker_id      String
+  worker         Worker               @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+  preset_role    WorkspacePresetRole
+  capabilities   String[]             @default([])
+  active         Boolean              @default(true)
+  created_at     DateTime             @default(now())
+  updated_at     DateTime             @updatedAt
+  profileAssignments WorkspaceProfileAssignment[]
+  @@unique([workspace_id, worker_id])
+  @@index([worker_id])
+  @@map("workspace_members")
+}
+
+model WorkspaceProfile {
+  id            String    @id @default(uuid())
+  workspace_id  String
+  workspace     Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  profile_id    String
+  profile       CloudProfile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+  vault_proxy_id  String?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  assignments   WorkspaceProfileAssignment[]
+  taskLinks     TaskProfile[]
+  @@unique([workspace_id, profile_id])
+  @@index([profile_id])
+  @@map("workspace_profiles")
+}
+
+model WorkspaceProfileAssignment {
+  id                    String            @id @default(uuid())
+  workspace_profile_id  String
+workspace_profile    WorkspaceProfile  @relation(fields: [workspace_profile_id], references: [id], onDelete: Cascade)
+  member_id            String?
+  member               WorkspaceMember?  @relation(fields: [member_id], references: [id], onDelete: Cascade)
+  worker_id            String
+  worker               Worker            @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+  created_at           DateTime          @default(now())
+  @@unique([workspace_profile_id, worker_id])
+  @@index([worker_id])
+  @@map("workspace_profile_assignments")
+}
+
+model SopTemplate {
+  id              String   @id @default(uuid())
+  workspace_id    String
+  workspace       Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  name            String
+  version         String
+  content_markdown String  @default("")
+  checklist       Json     @default("[]")
+  is_active       Boolean  @default(false)
+  created_by      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  tasks           WorkspaceTask[]
+  @@unique([workspace_id, name, version])
+  @@index([workspace_id, is_active])
+  @@map("sop_templates")
+}
+
+model WorkspaceTask {
+  id              String       @id @default(uuid())
+  workspace_id    String
+  workspace       Workspace    @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  title           String
+  description     String       @default("")
+  objective       String       @default("")
+  priority        TaskPriority @default(medium)
+  status          TaskStatus   @default(todo)
+  assignee_type   String       @default("worker")
+  assignee_id     String
+  sop_id          String?
+  sop_version     String?
+  sop_snapshot    Json?
+  sop             SopTemplate? @relation(fields: [sop_id], references: [id], onDelete: SetNull)
+  due_at          DateTime?
+  started_at      DateTime?
+  completed_at    DateTime?
+  created_by      String?
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+  profiles        TaskProfile[]
+  @@index([workspace_id, status])
+  @@index([workspace_id, assignee_type, assignee_id])
+  @@index([due_at])
+  @@map("workspace_tasks")
+}
+
+model TaskProfile {
+  task_id              String          @id
+  workspace_profile_id String
+  task                 WorkspaceTask   @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  workspace_profile    WorkspaceProfile @relation(fields: [workspace_profile_id], references: [id], onDelete: Cascade)
+  created_at           DateTime        @default(now())
+  @@unique([task_id, workspace_profile_id])
+  @@map("task_profiles")
+}
+
+model WorkspaceAuditEvent {
+  id               String         @id @default(uuid())
+  owner_id         String
+  workspace_id     String
+  workspace        Workspace      @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  actor_id         String
+  actor_type       String         @default("user")
+  actor_name       String         @default("")
+  user_role        String         @default("")
+  policy_mode      String         @default("ask")
+  tool_name        String         @default("")
+  capability       String         @default("")
+  action_class     String         @default("")
+  target_id        String         @default("")
+  confirmed        Boolean        @default(false)
+  status           String         @default("")
+  correlation_id   String?
+  parameter_digest String?
+  result_digest    String?
+  ip_address       String?
+  created_at       DateTime       @default(now())
+  @@index([workspace_id, created_at])
+  @@index([workspace_id, actor_id])
+  @@index([workspace_id, tool_name])
+  @@index([correlation_id])
+  @@map("workspace_audit_events")
+}
+
+model ProxyVaultEntry {
+  id                    String    @id @default(uuid())
+  workspace_id          String
+  workspace             Workspace @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  label                 String
+  kind                  String    @default("http")
+  host                  String
+  port                  Int
+  country              String    @default("")
+  region               String    @default("")
+  health_state          String    @default("unknown")
+  last_checked_at       DateTime?
+  ciphertext            String
+  nonce                 String
+  tag                   String
+  encrypted_dek         String
+  dek_nonce             String
+  dek_tag               String
+  key_version           Int       @default(2)
+  credential_fingerprint String   @unique
+  created_by            String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  @@index([workspace_id])
+  @@index([workspace_id, kind])
+  @@map("proxy_vault_entries")
 }

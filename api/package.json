@@ -8,7 +8,8 @@
     "dev": "node src/index.js",
     "migrate": "node src/migrate.js",
     "prisma:generate": "prisma generate",
-    "prisma:db-push": "prisma db push"
+    "prisma:db-push": "prisma db push",
+    "test": "node --test test/workspaces.test.js test/vault-crypto.test.js"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",
