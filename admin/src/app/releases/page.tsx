@@ -293,23 +293,21 @@ export default function ReleasesPage() {
           </div>
 
           <Input
-            label="Link artifact updater trực tiếp (HTTPS)"
+            label="Link artifact updater trực tiếp (HTTPS, tùy chọn)"
             placeholder="https://github.com/.../Clogin_1.2.0_x64-setup.nsis.zip"
             value={form.download_url}
             onChange={(e) => setForm({ ...form, download_url: e.target.value })}
-            required
           />
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">Chữ ký updater Tauri (.sig)</label>
+            <label className="block text-xs font-medium text-slate-300">Chữ ký updater Tauri (.sig, tùy chọn)</label>
             <textarea
               className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-sky-400 h-24"
               placeholder="Dán nguyên văn nội dung file .sig được tạo cùng artifact updater"
               value={form.update_signature}
               onChange={(e) => setForm({ ...form, update_signature: e.target.value })}
-              required
             />
-            <p className="text-[11px] text-slate-400">Release chỉ có thể Publish Current khi URL và chữ ký này hợp lệ.</p>
+            <p className="text-[11px] text-slate-400">Có thể tạo bản nháp trước. Dùng “Nhập từ GitHub” để tự lấy hai thông tin này; chỉ Publish Current mới bắt buộc.</p>
           </div>
 
           <Input

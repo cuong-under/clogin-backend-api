@@ -68,6 +68,19 @@ test('publishing requires a direct HTTPS updater artifact and signature', async 
   );
 });
 
+test('draft release can be created before updater artifact is available', async () => {
+  releases.clear();
+
+  const release = await releaseService.createRelease({
+    version: '1.2.0',
+    changelog: 'Chuẩn bị phát hành',
+  });
+
+  assert.equal(release.is_current, false);
+  assert.equal(release.download_url, null);
+  assert.equal(release.update_signature, null);
+});
+
 test('configured Current release produces the Tauri dynamic manifest', async () => {
   releases.clear();
   releases.set('ready', {

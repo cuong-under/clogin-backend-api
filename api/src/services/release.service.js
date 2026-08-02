@@ -181,9 +181,8 @@ class ReleaseService {
       is_current
     };
 
-    assertUpdateReady(data);
-
     if (is_current) {
+      assertUpdateReady(data);
       await prisma.release.updateMany({
         data: { is_current: false }
       });
@@ -210,12 +209,12 @@ class ReleaseService {
       min_version: data.min_version === undefined ? existing.min_version : (data.min_version?.trim() || null),
       is_current: data.is_current ?? existing.is_current
     };
-    if (!isHttpsUrl(next.download_url)) {
+    if (next.download_url && !isHttpsUrl(next.download_url)) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Link updater phải là URL HTTPS hợp lệ' };
     }
-    assertUpdateReady(next);
 
     if (next.is_current) {
+      assertUpdateReady(next);
       await prisma.release.updateMany({
         where: { id: { not: id } },
         data: { is_current: false }
