@@ -41,7 +41,7 @@ export default function ReleasesPage() {
       const res = await api.get<{ data: Release[] }>('/v1/admin/releases');
       setReleases(res.data || []);
     } catch (err) {
-      toast.error('KhÃ´ng thá»ƒ táº£i danh sÃ¡ch báº£n phÃ¡t hÃ nh');
+      toast.error('Không thể tải danh sách bản phát hành');
     } finally {
       setLoading(false);
     }
@@ -56,11 +56,11 @@ export default function ReleasesPage() {
     setSubmitting(true);
     try {
       await api.post('/v1/admin/releases', form);
-      toast.success('ÄÃ£ phÃ¡t hÃ nh phiÃªn báº£n má»›i');
+      toast.success('Đã phát hành phiên bản mới');
       setIsOpen(false);
       fetchReleases();
     } catch (err: any) {
-      toast.error(err.message || 'PhÃ¡t hÃ nh tháº¥t báº¡i');
+      toast.error(err.message || 'Phát hành thất bại');
     } finally {
       setSubmitting(false);
     }
@@ -69,10 +69,10 @@ export default function ReleasesPage() {
   const handleSetCurrent = async (id: string) => {
     try {
       await api.post(`/v1/admin/releases/${id}/publish`);
-      toast.success('ÄÃ£ thiáº¿t láº­p lÃ m phiÃªn báº£n hiá»‡n táº¡i (Current)');
+      toast.success('Đã thiết lập làm phiên bản hiện tại (Current)');
       fetchReleases();
     } catch (err: any) {
-      toast.error(err.message || 'Lá»—i khi Ä‘áº·t báº£n hiá»‡n táº¡i');
+      toast.error(err.message || 'Lỗi khi đặt bản hiện tại');
     }
   };
 
@@ -81,11 +81,11 @@ export default function ReleasesPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/releases/${deleteId}`);
-      toast.success('ÄÃ£ xÃ³a báº£n phÃ¡t hÃ nh');
+      toast.success('Đã xóa bản phát hành');
       setDeleteId(null);
       fetchReleases();
     } catch (err: any) {
-      toast.error(err.message || 'XÃ³a tháº¥t báº¡i');
+      toast.error(err.message || 'Xóa thất bại');
     } finally {
       setDeleting(false);
     }
@@ -106,7 +106,7 @@ export default function ReleasesPage() {
 
   const columns: Column<Release>[] = [
     {
-      header: 'PhiÃªn báº£n (Version)',
+      header: 'Phiên bản (Version)',
       cell: (item) => (
         <div className="flex items-center gap-2">
           <span className="font-bold text-slate-100 text-sm font-mono">{item.version}</span>
@@ -115,11 +115,11 @@ export default function ReleasesPage() {
       ),
     },
     {
-      header: 'KÃªnh (Channel)',
+      header: 'Kênh (Channel)',
       cell: (item) => getChannelBadge(item.channel),
     },
     {
-      header: 'Nháº­t kÃ½ thay Ä‘á»•i (Changelog)',
+      header: 'Nhật ký thay đổi (Changelog)',
       hideOnMobile: true,
       cell: (item) => (
         <span className="text-xs text-slate-300 max-w-xs block truncate" title={item.changelog}>
@@ -128,12 +128,12 @@ export default function ReleasesPage() {
       ),
     },
     {
-      header: 'NgÃ y phÃ¡t hÃ nh',
+      header: 'Ngày phát hành',
       hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-400">{formatDateShort(item.published_at)}</span>,
     },
     {
-      header: 'HÃ nh Ä‘á»™ng',
+      header: 'Hành động',
       cell: (item) => (
         <div className="flex items-center gap-2">
           {!item.is_current && (
@@ -153,7 +153,7 @@ export default function ReleasesPage() {
             className="text-rose-400 hover:bg-rose-500/10"
             icon={<Trash2 className="w-3.5 h-3.5" />}
           >
-            XÃ³a
+            Xóa
           </Button>
         </div>
       ),
@@ -165,13 +165,13 @@ export default function ReleasesPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <DownloadCloud className="w-5 h-5 text-sky-400" /> Quáº£n lÃ½ Báº£n phÃ¡t hÃ nh (Releases)
+            <DownloadCloud className="w-5 h-5 text-sky-400" /> Quản lý Bản phát hành (Releases)
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">PhÃ¡t hÃ nh vÃ  cáº­p nháº­t cÃ¡c phiÃªn báº£n Clogin Studio Desktop Client</p>
+          <p className="text-xs text-slate-400 mt-0.5">Phát hành và cập nhật các phiên bản Clogin Studio Desktop Client</p>
         </div>
 
         <Button variant="primary" size="sm" onClick={() => setIsOpen(true)} icon={<Plus className="w-4 h-4" />}>
-          Táº¡o Release má»›i
+          Tạo Release mới
         </Button>
       </div>
 
@@ -181,14 +181,14 @@ export default function ReleasesPage() {
       <Modal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        title="PhÃ¡t hÃ nh phiÃªn báº£n á»©ng dá»¥ng má»›i"
+        title="Phát hành phiên bản ứng dụng mới"
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => setIsOpen(false)}>
-              Há»§y
+              Hủy
             </Button>
             <Button variant="primary" size="sm" onClick={handleCreate} isLoading={submitting}>
-              PhÃ¡t hÃ nh
+              Phát hành
             </Button>
           </>
         }
@@ -196,26 +196,26 @@ export default function ReleasesPage() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label="PhiÃªn báº£n (Version)"
+              label="Phiên bản (Version)"
               placeholder="VD: 1.2.0"
               value={form.version}
               onChange={(e) => setForm({ ...form, version: e.target.value })}
               required
             />
             <Select
-              label="KÃªnh phÃ¡t hÃ nh"
+              label="Kênh phát hành"
               value={form.channel}
               onChange={(e) => setForm({ ...form, channel: e.target.value as Channel })}
               options={[
-                { value: 'stable', label: 'Stable (ChÃ­nh thá»©c)' },
-                { value: 'beta', label: 'Beta (Thá»­ nghiá»‡m)' },
-                { value: 'canary', label: 'Canary (Má»›i nháº¥t)' },
+                { value: 'stable', label: 'Stable (Chính thức)' },
+                { value: 'beta', label: 'Beta (Thử nghiệm)' },
+                { value: 'canary', label: 'Canary (Mới nhất)' },
               ]}
             />
           </div>
 
           <Input
-            label="Link táº£i file cÃ i Ä‘áº·t (Download URL)"
+            label="Link tải file cài đặt (Download URL)"
             placeholder="https://clogin.nghemmo.com/download/Clogin_1.2.0.exe"
             value={form.download_url}
             onChange={(e) => setForm({ ...form, download_url: e.target.value })}
@@ -223,17 +223,17 @@ export default function ReleasesPage() {
           />
 
           <Input
-            label="PhiÃªn báº£n tá»‘i thiá»ƒu yÃªu cáº§u (Min Version)"
+            label="Phiên bản tối thiểu yêu cầu (Min Version)"
             placeholder="VD: 1.0.0"
             value={form.min_version}
             onChange={(e) => setForm({ ...form, min_version: e.target.value })}
           />
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">Ná»™i dung cáº­p nháº­t (Changelog)</label>
+            <label className="block text-xs font-medium text-slate-300">Nội dung cập nhật (Changelog)</label>
             <textarea
               className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm text-slate-100 focus:outline-none focus:border-sky-400 h-28"
-              placeholder="- Tá»‘i Æ°u tá»‘c Ä‘á»™ má»Ÿ Profile&#10;- Sá»­a lá»—i cookie sync"
+              placeholder="- Tối ưu tốc độ mở Profile&#10;- Sửa lỗi cookie sync"
               value={form.changelog}
               onChange={(e) => setForm({ ...form, changelog: e.target.value })}
               required
@@ -247,8 +247,8 @@ export default function ReleasesPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         isLoading={deleting}
-        title="XÃ³a Release"
-        message="Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a báº£n phÃ¡t hÃ nh nÃ y?"
+        title="Xóa Release"
+        message="Bạn có chắc chắn muốn xóa bản phát hành này?"
       />
     </div>
   );
