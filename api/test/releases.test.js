@@ -129,4 +129,19 @@ test('GitHub import stores the signed Windows updater artifact', async () => {
   assert.equal(result.release.update_signature, 'signed-update-artifact');
 });
 
+test('draft release requires GitHub signing before a build can start', async () => {
+  releases.clear();
+  releases.set('draft', { id: 'draft', version: '1.2.0', is_current: false, build_status: 'draft' });
+
+  await assert.rejects(
+    releaseService.startBuild('draft'),
+    (error) => error.code === 'GITHUB_TOKEN_REQUIRED'
+  );
+});
+
+test('signing key validation accepts a valid Tauri minisign private key', async () => {
+  const privateKey = 'dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5eXQ3Z3NKSVdUOVphL1Avb1I3RG9mUFR6MjJ3aVFEUG4zZURRV3poRzN2a0FBQkFBQUFBQUFBQUFBQUlBQUFBQVB3QTlEdGFqdERTcmQwY1lnNTdZMXlRV21XYXBwZ0VqN3B6bWk2UGJ4dU01Rmd5UW82MStWa04wSkFyZWtVclB6M2EzeEc3Ynk5VUpEUFM1TUZaUlp3K1cwdWYvMTFYMklsUHo0OVp2WXdKTDRXL2o5MGZUVTljbEVFeXBOS0FDbEo4Nk5seVh5ZW89Cg==';
+  await releaseService.validateSigningKey(privateKey);
+});
+
 after(() => { global.fetch = originalFetch; });

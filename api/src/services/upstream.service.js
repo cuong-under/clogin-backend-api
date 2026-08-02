@@ -13,7 +13,8 @@ class UpstreamService {
       github_token: val.github_token || process.env.GITHUB_TOKEN || '',
       upstream_repo: val.upstream_repo || DEFAULT_UPSTREAM,
       origin_repo: val.origin_repo || DEFAULT_ORIGIN,
-      target_branch: val.target_branch || 'main'
+      target_branch: val.target_branch || 'main',
+      release_branch: val.release_branch || 'refactor/code-organization'
     };
   }
 
@@ -23,7 +24,8 @@ class UpstreamService {
       github_token: data.github_token !== undefined ? data.github_token : current.github_token,
       upstream_repo: data.upstream_repo || current.upstream_repo,
       origin_repo: data.origin_repo || current.origin_repo,
-      target_branch: data.target_branch || current.target_branch
+      target_branch: data.target_branch || current.target_branch,
+      release_branch: data.release_branch || current.release_branch
     };
 
     await prisma.systemConfig.upsert({

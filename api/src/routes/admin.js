@@ -657,6 +657,34 @@ router.post('/releases/import-github', requireRole(['super_admin']), async (req,
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
+router.post('/releases/:id/build', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await releaseService.startBuild(req.params.id);
+    return res.status(202).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.get('/releases/updater-signing', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await releaseService.getUpdaterSigningStatus();
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.put('/releases/updater-signing', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await releaseService.configureUpdaterSigning(req.body);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
+router.get('/releases/:id/build-status', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const release = await releaseService.getBuildStatus(req.params.id);
+    return res.status(200).json(release);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
 router.post('/releases/:id/publish', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const release = await releaseService.publishRelease(req.params.id);

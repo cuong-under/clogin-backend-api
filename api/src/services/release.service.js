@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const sodium = require('libsodium-wrappers');
 const prisma = new PrismaClient();
 
 function isHttpsUrl(value) {
@@ -35,10 +36,23 @@ function assertUpdateReady(release) {
   }
 }
 
+function isVersion(value) {
+  return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(value);
+}
+
 class ReleaseService {
-  async getGitHubHeaders() {
+  async getReleaseBuildConfig() {
     const config = await prisma.systemConfig.findUnique({ where: { key: 'upstream_sync_config' } });
-    const token = config?.value?.github_token || process.env.GITHUB_TOKEN;
+    const value = config?.value || {};
+    return {
+      token: value.github_token || process.env.GITHUB_TOKEN || '',
+      repository: value.origin_repo || 'cuong-under/CloginStudio',
+      branch: value.release_branch || 'refactor/code-organization'
+    };
+  }
+
+  async getGitHubHeaders() {
+    const { token } = await this.getReleaseBuildConfig();
     const headers = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'CloginStudio-Release-Manager',
@@ -46,6 +60,292 @@ class ReleaseService {
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     return headers;
+  }
+
+  async githubRequest(path, options = {}) {
+    const headers = await this.getGitHubHeaders();
+    const response = await fetch(`https://api.github.com${path}`, {
+      ...options,
+      headers: { ...headers, ...(options.headers || {}) }
+    });
+    if (response.ok) return response;
+
+    const detail = await response.json().catch(() => ({}));
+    throw {
+      statusCode: response.status === 401 || response.status === 403 ? 403 : 502,
+      code: 'GITHUB_API_ERROR',
+      message: detail.message || `GitHub API trả về lỗi ${response.status}`
+    };
+  }
+
+  async getUpdaterSigningStatus() {
+    const { repository } = await this.getReleaseBuildConfig();
+    try {
+      const response = await this.githubRequest(`/repos/${repository}/actions/secrets?per_page=100`);
+      const names = new Set((await response.json()).secrets?.map((secret) => secret.name) || []);
+      return {
+        configured: names.has('TAURI_SIGNING_PRIVATE_KEY'),
+        has_password: names.has('TAURI_SIGNING_PRIVATE_KEY_PASSWORD'),
+        can_manage: true
+      };
+    } catch (error) {
+      if (error.statusCode === 403) {
+        return { configured: false, has_password: false, can_manage: false };
+      }
+      throw error;
+    }
+  }
+
+  async setGitHubActionSecret(name, value) {
+    const { repository } = await this.getReleaseBuildConfig();
+    const keyResponse = await this.githubRequest(`/repos/${repository}/actions/secrets/public-key`);
+    const publicKey = await keyResponse.json();
+    await sodium.ready;
+    const encryptedValue = sodium.to_base64(
+      sodium.crypto_box_seal(
+        sodium.from_string(value),
+        sodium.from_base64(publicKey.key, sodium.base64_variants.ORIGINAL)
+      ),
+      sodium.base64_variants.ORIGINAL
+    );
+    await this.githubRequest(`/repos/${repository}/actions/secrets/${name}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ encrypted_value: encryptedValue, key_id: publicKey.key_id })
+    });
+  }
+
+  async validateSigningKey(privateKey) {
+    await sodium.ready;
+    const privateKeyLine = privateKey.trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1);
+    const decoded = sodium.from_base64(privateKeyLine, sodium.base64_variants.ORIGINAL);
+    const privateKeyDocument = sodium.to_string(decoded);
+    const privateKeyPayload = privateKeyDocument.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).at(-1);
+    const privateKeyBytes = sodium.from_base64(privateKeyPayload, sodium.base64_variants.ORIGINAL);
+    const marker = sodium.from_string('Ed');
+    const keyOffset = privateKeyBytes.findIndex((_, index) => privateKeyBytes.slice(index, index + marker.length).every((byte, markerIndex) => byte === marker[markerIndex]));
+    if (keyOffset < 0 || privateKeyBytes.length < keyOffset + 74) {
+      throw { statusCode: 400, code: 'INVALID_SIGNING_KEY', message: 'Private key Tauri không đúng định dạng minisign' };
+    }
+  }
+
+  async configureUpdaterSigning({ private_key, password = '' }) {
+    if (!private_key?.trim()) {
+      throw { statusCode: 400, code: 'SIGNING_KEY_REQUIRED', message: 'Cần private key Tauri để ký updater' };
+    }
+    await this.validateSigningKey(private_key);
+    await this.setGitHubActionSecret('TAURI_SIGNING_PRIVATE_KEY', private_key.trim());
+    const { repository } = await this.getReleaseBuildConfig();
+    if (password) {
+      await this.setGitHubActionSecret('TAURI_SIGNING_PRIVATE_KEY_PASSWORD', password);
+    } else {
+      await this.githubRequest(`/repos/${repository}/actions/secrets/TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, { method: 'DELETE' });
+    }
+    return this.getUpdaterSigningStatus();
+  }
+
+  async getRepositoryFile(repository, branch, path) {
+    const response = await this.githubRequest(
+      `/repos/${repository}/contents/${path}?ref=${encodeURIComponent(branch)}`
+    );
+    const file = await response.json();
+    return {
+      sha: file.sha,
+      content: Buffer.from(file.content.replace(/\n/g, ''), 'base64').toString('utf8')
+    };
+  }
+
+  updateVersionFiles(files, version) {
+    const packageJson = JSON.parse(files.get('package.json').content);
+    packageJson.version = version;
+
+    const packageLock = JSON.parse(files.get('package-lock.json').content);
+    packageLock.version = version;
+    if (packageLock.packages?.['']) packageLock.packages[''].version = version;
+
+    const cargoToml = files.get('src-tauri/Cargo.toml').content.replace(
+      /^(version\s*=\s*")[^"]+("\s*)$/m,
+      `$1${version}$2`
+    );
+    const tauriConfig = JSON.parse(files.get('src-tauri/tauri.conf.json').content);
+    tauriConfig.version = version;
+
+    return new Map([
+      ['package.json', `${JSON.stringify(packageJson, null, 2)}\n`],
+      ['package-lock.json', `${JSON.stringify(packageLock, null, 2)}\n`],
+      ['src-tauri/Cargo.toml', cargoToml],
+      ['src-tauri/tauri.conf.json', `${JSON.stringify(tauriConfig, null, 2)}\n`]
+    ]);
+  }
+
+  async startBuild(id) {
+    const release = await prisma.release.findUnique({ where: { id } });
+    if (!release) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Release không tồn tại' };
+    if (!isVersion(release.version)) {
+      throw { statusCode: 400, code: 'INVALID_VERSION', message: 'Phiên bản phải theo SemVer, ví dụ 1.1.11' };
+    }
+    if (release.is_current) {
+      throw { statusCode: 400, code: 'CURRENT_RELEASE', message: 'Không thể build lại Release Current' };
+    }
+    if (['queued', 'building'].includes(release.build_status)) {
+      throw { statusCode: 409, code: 'BUILD_IN_PROGRESS', message: 'Release này đang được GitHub Actions build' };
+    }
+
+    const { token, repository, branch } = await this.getReleaseBuildConfig();
+    if (!token) {
+      throw {
+        statusCode: 400,
+        code: 'GITHUB_TOKEN_REQUIRED',
+        message: 'Cần cấu hình GitHub Token trong Releases > Đồng bộ Upstream để Portal tự build release'
+      };
+    }
+    const signing = await this.getUpdaterSigningStatus();
+    if (!signing.can_manage) {
+      throw {
+        statusCode: 400,
+        code: 'GITHUB_TOKEN_SCOPE_REQUIRED',
+        message: 'GitHub Token chưa có quyền Actions Secrets. Tạo fine-grained token có Contents: Read and write, Actions: Read and write rồi lưu tại Releases > Đồng bộ Upstream.'
+      };
+    }
+    if (!signing.configured) {
+      throw {
+        statusCode: 400,
+        code: 'UPDATER_SIGNING_NOT_CONFIGURED',
+        message: 'Chưa cấu hình private key ký updater. Mở Cấu hình ký updater trong Releases và dán private key Tauri tương ứng với public key của app.'
+      };
+    }
+
+    const tag = `v${release.version}`;
+    const tagCheck = await fetch(`https://api.github.com/repos/${repository}/git/ref/tags/${tag}`, {
+      headers: await this.getGitHubHeaders()
+    });
+    if (tagCheck.ok) {
+      throw { statusCode: 409, code: 'TAG_EXISTS', message: `Tag ${tag} đã tồn tại trên GitHub` };
+    }
+    if (tagCheck.status !== 404) {
+      const detail = await tagCheck.json().catch(() => ({}));
+      throw { statusCode: 502, code: 'GITHUB_API_ERROR', message: detail.message || 'Không thể kiểm tra tag GitHub' };
+    }
+
+    const branchRef = await this.githubRequest(`/repos/${repository}/git/ref/heads/${encodeURIComponent(branch)}`);
+    const baseCommitSha = (await branchRef.json()).object.sha;
+    const baseCommit = await this.githubRequest(`/repos/${repository}/git/commits/${baseCommitSha}`);
+    const baseTreeSha = (await baseCommit.json()).tree.sha;
+
+    const paths = ['package.json', 'package-lock.json', 'src-tauri/Cargo.toml', 'src-tauri/tauri.conf.json'];
+    const files = new Map();
+    for (const path of paths) files.set(path, await this.getRepositoryFile(repository, branch, path));
+    const updatedFiles = this.updateVersionFiles(files, release.version);
+
+    const tree = [];
+    for (const [path, content] of updatedFiles) {
+      const blobResponse = await this.githubRequest(`/repos/${repository}/git/blobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, encoding: 'utf-8' })
+      });
+      const blob = await blobResponse.json();
+      tree.push({ path, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+
+    const treeResponse = await this.githubRequest(`/repos/${repository}/git/trees`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base_tree: baseTreeSha, tree })
+    });
+    const nextTree = await treeResponse.json();
+    const commitResponse = await this.githubRequest(`/repos/${repository}/git/commits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `chore(release): v${release.version}`,
+        tree: nextTree.sha,
+        parents: [baseCommitSha]
+      })
+    });
+    const commit = await commitResponse.json();
+
+    await this.githubRequest(`/repos/${repository}/git/refs/heads/${encodeURIComponent(branch)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sha: commit.sha, force: false })
+    });
+    await this.githubRequest(`/repos/${repository}/git/refs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: commit.sha })
+    });
+
+    const updatedRelease = await prisma.release.update({
+      where: { id },
+      data: {
+        build_status: 'queued',
+        build_commit_sha: commit.sha,
+        source_branch: branch,
+        build_error: null,
+        build_started_at: new Date()
+      }
+    });
+    return { release: updatedRelease, tag, commit_sha: commit.sha, source_branch: branch };
+  }
+
+  async getBuildStatus(id) {
+    const release = await prisma.release.findUnique({ where: { id } });
+    if (!release) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Release không tồn tại' };
+    if (!release.build_commit_sha || !['queued', 'building'].includes(release.build_status)) return release;
+
+    const { repository } = await this.getReleaseBuildConfig();
+    const runsResponse = await this.githubRequest(
+      `/repos/${repository}/actions/runs?event=push&head_sha=${release.build_commit_sha}&per_page=20`
+    );
+    const data = await runsResponse.json();
+    const run = (data.workflow_runs || []).find((item) => item.name === 'Release');
+    if (!run) return release;
+
+    if (run.status !== 'completed') {
+      return prisma.release.update({
+        where: { id },
+        data: { build_status: 'building', build_run_id: String(run.id) }
+      });
+    }
+    if (run.conclusion !== 'success') {
+      return prisma.release.update({
+        where: { id },
+        data: {
+          build_status: 'failed',
+          build_run_id: String(run.id),
+          build_error: `GitHub Actions build thất bại: ${run.html_url}`
+        }
+      });
+    }
+
+    try {
+      const result = await this.importGitHubRelease({
+        version: release.version,
+        channel: release.channel,
+        changelog: release.changelog,
+        min_version: release.min_version || ''
+      });
+      return prisma.release.update({
+        where: { id },
+        data: {
+          build_status: 'ready',
+          build_run_id: String(run.id),
+          build_error: null,
+          download_url: result.release.download_url,
+          update_signature: result.release.update_signature
+        }
+      });
+    } catch (error) {
+      return prisma.release.update({
+        where: { id },
+        data: {
+          build_status: 'building',
+          build_run_id: String(run.id),
+          build_error: error.message || 'Đang chờ artifact updater từ GitHub Release'
+        }
+      });
+    }
   }
 
   async importGitHubRelease({ version, channel = 'stable', changelog = '', min_version = '' }) {

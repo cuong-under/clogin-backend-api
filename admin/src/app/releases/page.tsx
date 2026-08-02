@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { DownloadCloud, Plus, CheckCircle, Edit2, Github, Trash2 } from 'lucide-react';
+import { DownloadCloud, KeyRound, Plus, CheckCircle, Edit2, Github, Play, Trash2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Release, Channel } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
@@ -43,6 +43,11 @@ export default function ReleasesPage() {
     min_version: '',
   });
   const [importingGitHub, setImportingGitHub] = useState(false);
+  const [buildingReleaseId, setBuildingReleaseId] = useState<string | null>(null);
+  const [isSigningOpen, setIsSigningOpen] = useState(false);
+  const [signingStatus, setSigningStatus] = useState({ configured: false, has_password: false, can_manage: true });
+  const [signingForm, setSigningForm] = useState({ private_key: '', password: '' });
+  const [savingSigning, setSavingSigning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // Delete Confirm
@@ -53,7 +58,16 @@ export default function ReleasesPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: Release[] }>('/v1/admin/releases');
-      setReleases(res.data || []);
+      const nextReleases = res.data || [];
+      const releasesWithLiveBuildStatus = await Promise.all(nextReleases.map(async (release) => {
+        if (!['queued', 'building'].includes(release.build_status || '')) return release;
+        try {
+          return await api.get<Release>(`/v1/admin/releases/${release.id}/build-status`);
+        } catch {
+          return release;
+        }
+      }));
+      setReleases(releasesWithLiveBuildStatus);
     } catch (err) {
       toast.error('Không thể tải danh sách bản phát hành');
     } finally {
@@ -64,6 +78,43 @@ export default function ReleasesPage() {
   useEffect(() => {
     fetchReleases();
   }, []);
+
+  const fetchSigningStatus = async () => {
+    try {
+      const status = await api.get<{ configured: boolean; has_password: boolean; can_manage: boolean }>('/v1/admin/releases/updater-signing');
+      setSigningStatus(status);
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể kiểm tra cấu hình ký updater');
+    }
+  };
+
+  const handleOpenSigning = () => {
+    setSigningForm({ private_key: '', password: '' });
+    setIsSigningOpen(true);
+    fetchSigningStatus();
+  };
+
+  const handleSaveSigning = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingSigning(true);
+    try {
+      const status = await api.put<{ configured: boolean; has_password: boolean; can_manage: boolean }>('/v1/admin/releases/updater-signing', signingForm);
+      setSigningStatus(status);
+      setSigningForm({ private_key: '', password: '' });
+      setIsSigningOpen(false);
+      toast.success('Đã lưu private key vào GitHub Actions Secrets');
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể lưu private key ký updater');
+    } finally {
+      setSavingSigning(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!releases.some((release) => ['queued', 'building'].includes(release.build_status || ''))) return;
+    const interval = window.setInterval(fetchReleases, 10_000);
+    return () => window.clearInterval(interval);
+  }, [releases]);
 
   const handleOpenCreate = () => {
     setEditingRelease(null);
@@ -132,6 +183,19 @@ export default function ReleasesPage() {
     }
   };
 
+  const handleBuild = async (release: Release) => {
+    setBuildingReleaseId(release.id);
+    try {
+      const result = await api.post<{ tag: string }>('/v1/admin/releases/' + release.id + '/build');
+      toast.success(`Đã tạo ${result.tag}; GitHub Actions đang build updater`);
+      fetchReleases();
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể khởi tạo bản build');
+    } finally {
+      setBuildingReleaseId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
@@ -158,6 +222,14 @@ export default function ReleasesPage() {
       default:
         return <Badge variant="default">{channel}</Badge>;
     }
+  };
+
+  const getBuildBadge = (release: Release) => {
+    if (isUpdateReady(release) || release.build_status === 'ready') return <Badge variant="success">Sẵn sàng</Badge>;
+    if (release.build_status === 'queued') return <Badge variant="info">Đang xếp hàng</Badge>;
+    if (release.build_status === 'building') return <Badge variant="warning">Đang build</Badge>;
+    if (release.build_status === 'failed') return <Badge variant="danger">Build lỗi</Badge>;
+    return <Badge variant="default">Bản nháp</Badge>;
   };
 
   const columns: Column<Release>[] = [
@@ -191,9 +263,7 @@ export default function ReleasesPage() {
     {
       header: 'Auto-update',
       hideOnMobile: true,
-      cell: (item) => isUpdateReady(item)
-        ? <Badge variant="success">Sẵn sàng</Badge>
-        : <Badge variant="warning">Thiếu artifact/.sig</Badge>,
+      cell: (item) => <span title={item.build_error || undefined}>{getBuildBadge(item)}</span>,
     },
     {
       header: 'Hành động',
@@ -207,6 +277,19 @@ export default function ReleasesPage() {
           >
             Sửa
           </Button>
+          {!item.is_current && !isUpdateReady(item) && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => handleBuild(item)}
+              isLoading={buildingReleaseId === item.id || ['queued', 'building'].includes(item.build_status || '')}
+              disabled={['queued', 'building'].includes(item.build_status || '')}
+              title={item.build_error || 'Tạo commit/tag và build updater qua GitHub Actions'}
+              icon={<Play className="w-3.5 h-3.5" />}
+            >
+              {item.build_status === 'failed' ? 'Build lại' : 'Build'}
+            </Button>
+          )}
           {!item.is_current && (
             <Button
               variant="outline"
@@ -244,8 +327,11 @@ export default function ReleasesPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={handleOpenSigning} icon={<KeyRound className="w-4 h-4" />}>
+            Ký updater {signingStatus.configured ? 'đã sẵn sàng' : 'cần cấu hình'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setIsGitHubImportOpen(true)} icon={<Github className="w-4 h-4" />}>
-            Nhập từ GitHub
+            Nhập artifact có sẵn
           </Button>
           <Button variant="primary" size="sm" onClick={handleOpenCreate} icon={<Plus className="w-4 h-4" />}>
             Tạo Release mới
@@ -272,6 +358,11 @@ export default function ReleasesPage() {
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!editingRelease && (
+            <p className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs leading-relaxed text-sky-100">
+              Tạo bản nháp trước, sau đó bấm <strong>Build</strong> ở danh sách. Portal sẽ tự tăng version, tạo tag, chạy GitHub Actions và nhận artifact updater đã ký.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Phiên bản (Version)"
@@ -292,23 +383,27 @@ export default function ReleasesPage() {
             />
           </div>
 
-          <Input
-            label="Link artifact updater trực tiếp (HTTPS, tùy chọn)"
-            placeholder="https://github.com/.../Clogin_1.2.0_x64-setup.nsis.zip"
-            value={form.download_url}
-            onChange={(e) => setForm({ ...form, download_url: e.target.value })}
-          />
-
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-slate-300">Chữ ký updater Tauri (.sig, tùy chọn)</label>
-            <textarea
-              className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-sky-400 h-24"
-              placeholder="Dán nguyên văn nội dung file .sig được tạo cùng artifact updater"
-              value={form.update_signature}
-              onChange={(e) => setForm({ ...form, update_signature: e.target.value })}
-            />
-            <p className="text-[11px] text-slate-400">Có thể tạo bản nháp trước. Dùng “Nhập từ GitHub” để tự lấy hai thông tin này; chỉ Publish Current mới bắt buộc.</p>
-          </div>
+          <details className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-2">
+            <summary className="cursor-pointer text-xs font-medium text-slate-300">Cấu hình artifact updater thủ công (nâng cao)</summary>
+            <div className="mt-4 space-y-4">
+              <Input
+                label="Link artifact updater trực tiếp (HTTPS, tùy chọn)"
+                placeholder="https://github.com/.../Clogin_1.2.0_x64-setup.nsis.zip"
+                value={form.download_url}
+                onChange={(e) => setForm({ ...form, download_url: e.target.value })}
+              />
+              <div className="space-y-1.5">
+                <label className="block text-xs font-medium text-slate-300">Chữ ký updater Tauri (.sig, tùy chọn)</label>
+                <textarea
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-sky-400 h-24"
+                  placeholder="Dán nguyên văn nội dung file .sig được tạo cùng artifact updater"
+                  value={form.update_signature}
+                  onChange={(e) => setForm({ ...form, update_signature: e.target.value })}
+                />
+                <p className="text-[11px] text-slate-400">Chỉ dùng khi artifact đã được build bên ngoài Portal. Publish Current vẫn bắt buộc đủ URL và chữ ký.</p>
+              </div>
+            </div>
+          </details>
 
           <Input
             label="Phiên bản tối thiểu yêu cầu (Min Version)"
@@ -331,9 +426,55 @@ export default function ReleasesPage() {
       </Modal>
 
       <Modal
+        isOpen={isSigningOpen}
+        onClose={() => setIsSigningOpen(false)}
+        title="Cấu hình ký updater"
+        footer={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setIsSigningOpen(false)}>Hủy</Button>
+            <Button variant="primary" size="sm" onClick={handleSaveSigning} isLoading={savingSigning} disabled={!signingStatus.can_manage}>
+              Lưu vào GitHub Secrets
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleSaveSigning} className="space-y-4">
+          <p className="text-xs leading-relaxed text-slate-400">
+            Key chỉ được mã hóa và gửi thẳng đến GitHub Actions Secrets, không lưu trong cơ sở dữ liệu Clogin. Portal dùng key này để GitHub ký artifact updater mỗi lần bấm Build.
+          </p>
+          <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs text-sky-200">
+            Trạng thái: {signingStatus.configured ? 'Đã có private key ký updater trên GitHub' : 'Chưa cấu hình private key'}
+          </div>
+          {!signingStatus.can_manage && (
+            <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+              GitHub Token hiện tại thiếu quyền quản lý Actions Secrets. Vào <strong>Releases &gt; Đồng bộ Upstream</strong>, cập nhật token fine-grained với quyền <strong>Contents: Read and write</strong> và <strong>Actions: Read and write</strong>, sau đó mở lại màn hình này.
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-300">Tauri signing private key</label>
+            <textarea
+              className="w-full rounded-lg bg-slate-900 border border-slate-700 p-3 text-sm font-mono text-slate-100 focus:outline-none focus:border-sky-400 h-32"
+              placeholder="untrusted comment: minisign secret key..."
+              value={signingForm.private_key}
+              onChange={(e) => setSigningForm({ ...signingForm, private_key: e.target.value })}
+              required={signingStatus.can_manage}
+              disabled={!signingStatus.can_manage}
+            />
+          </div>
+          <Input
+            label="Mật khẩu key (nếu key được mã hóa)"
+            type="password"
+            value={signingForm.password}
+            onChange={(e) => setSigningForm({ ...signingForm, password: e.target.value })}
+            disabled={!signingStatus.can_manage}
+          />
+        </form>
+      </Modal>
+
+      <Modal
         isOpen={isGitHubImportOpen}
         onClose={() => setIsGitHubImportOpen(false)}
-        title="Nhập artifact updater từ GitHub Release"
+        title="Nhập artifact updater có sẵn từ GitHub"
         footer={
           <>
             <Button variant="outline" size="sm" onClick={() => setIsGitHubImportOpen(false)}>Hủy</Button>

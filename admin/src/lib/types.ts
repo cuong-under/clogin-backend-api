@@ -118,10 +118,16 @@ export interface Release {
   version: string;
   channel: Channel;
   changelog: string;
-  download_url: string;
+  download_url: string | null;
   update_signature?: string | null;
   min_version?: string;
   is_current: boolean;
+  build_status?: 'draft' | 'queued' | 'building' | 'ready' | 'failed';
+  build_run_id?: string | null;
+  build_commit_sha?: string | null;
+  source_branch?: string | null;
+  build_error?: string | null;
+  build_started_at?: string | null;
   published_at: string;
 }
 
@@ -229,4 +235,5 @@ export interface UpstreamConfig {
   upstream_repo: string;
   origin_repo: string;
   target_branch: string;
+  release_branch: string;
 }

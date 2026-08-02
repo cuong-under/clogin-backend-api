@@ -34,7 +34,8 @@ export default function UpstreamSyncPage() {
     github_token: '',
     upstream_repo: 'ProxyShard/ShardBrowser',
     origin_repo: 'cuong-under/CloginStudio',
-    target_branch: 'main'
+    target_branch: 'main',
+    release_branch: 'refactor/code-organization'
   });
 
   const [loading, setLoading] = useState(true);
@@ -372,6 +373,14 @@ export default function UpstreamSyncPage() {
             value={config.target_branch}
             onChange={(e) => setConfig({ ...config, target_branch: e.target.value })}
           />
+
+          <Input
+            label="Release Branch (Nhánh Phát Hành)"
+            placeholder="refactor/code-organization"
+            value={config.release_branch}
+            onChange={(e) => setConfig({ ...config, release_branch: e.target.value })}
+          />
+          <p className="text-[11px] text-slate-400">Admin Portal sẽ tạo commit version và tag release trên nhánh này khi bấm Build trong Releases.</p>
 
           <div className="flex justify-end gap-2 pt-3">
             <Button variant="ghost" type="button" onClick={() => setShowConfigModal(false)}>

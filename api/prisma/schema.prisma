@@ -182,17 +182,23 @@ model LoginHistory {
 }
 
 model Release {
-  id            String         @id @default(uuid())
-  version       String         @unique
-  channel       ReleaseChannel @default(stable)
-  changelog     String         @default("")
-  download_url  String?
+  id               String         @id @default(uuid())
+  version          String         @unique
+  channel          ReleaseChannel @default(stable)
+  changelog        String         @default("")
+  download_url     String?
   update_signature String?        @db.Text
-  min_version   String?
-  is_current    Boolean        @default(false)
-  published_at  DateTime       @default(now())
-  created_at    DateTime       @default(now())
-  updated_at    DateTime       @updatedAt
+  min_version      String?
+  is_current       Boolean        @default(false)
+  build_status     String         @default("draft")
+  build_run_id     String?
+  build_commit_sha String?
+  source_branch    String?
+  build_error      String?
+  build_started_at DateTime?
+  published_at     DateTime       @default(now())
+  created_at       DateTime       @default(now())
+  updated_at       DateTime       @updatedAt
   @@index([channel, is_current])
   @@map("releases")
 }
