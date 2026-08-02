@@ -7,6 +7,7 @@ const { sendError } = require('../middleware/error');
 router.get('/update', async (req, res, next) => {
   try {
     const result = await releaseService.getLatestRelease();
+    if (!result) return res.status(204).end();
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
@@ -20,7 +21,8 @@ router.get('/update', async (req, res, next) => {
 router.get('/update/manifest', async (req, res, next) => {
   try {
     const manifest = await releaseService.getUpdateManifest();
-    return res.status(200).json(manifest);
+    if (!manifest) return res.status(204).end();
+    return res.status(200).type('application/json; charset=utf-8').json(manifest);
   } catch (err) {
     if (err.statusCode) {
       return sendError(res, err.statusCode, err.code, err.message);

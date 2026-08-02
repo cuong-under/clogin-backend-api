@@ -119,6 +119,7 @@ export interface Release {
   channel: Channel;
   changelog: string;
   download_url: string;
+  update_signature?: string | null;
   min_version?: string;
   is_current: boolean;
   published_at: string;

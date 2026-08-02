@@ -650,6 +650,13 @@ router.post('/releases', requireRole(['super_admin']), async (req, res, next) =>
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
+router.post('/releases/import-github', requireRole(['super_admin']), async (req, res, next) => {
+  try {
+    const result = await releaseService.importGitHubRelease(req.body);
+    return res.status(200).json(result);
+  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+});
+
 router.post('/releases/:id/publish', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const release = await releaseService.publishRelease(req.params.id);

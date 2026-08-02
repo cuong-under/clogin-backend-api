@@ -187,6 +187,7 @@ model Release {
   channel       ReleaseChannel @default(stable)
   changelog     String         @default("")
   download_url  String?
+  update_signature String?        @db.Text
   min_version   String?
   is_current    Boolean        @default(false)
   published_at  DateTime       @default(now())

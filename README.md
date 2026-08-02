@@ -19,6 +19,7 @@ clogin-backend-api/
 │   ├── package.json
 │   ├── Dockerfile
 │   └── .env.example
+├── admin/                    # Next.js Admin Portal
 └── README.md
 ```
 
@@ -28,6 +29,18 @@ clogin-backend-api/
 - **Admin Portal API**: Comprehensive management suite for licenses, plans, coupons, users, profiles, audit logs, releases, announcements, system config, feature flags, and admin users.
 - **Prisma & PostgreSQL**: Robust database schema supporting relationships, security audit logs, login history, and IP blocking.
 - **RBAC**: Admin role-based access control (`super_admin`, `support`, `viewer`).
+
+## Phát Hành Desktop Thật
+
+Admin Portal không tự biên dịch hay tạo file cài đặt. Nó quản lý metadata của artifact đã được GitHub Actions build và ký. Một release chỉ có thể trở thành **Current** khi có đủ artifact updater Windows và chữ ký Tauri tương ứng.
+
+1. Tăng đồng bộ phiên bản trong `package.json`, `src-tauri/Cargo.toml`, và `src-tauri/tauri.conf.json` của `CloginStudio`.
+2. Thiết lập GitHub Actions secrets `TAURI_SIGNING_PRIVATE_KEY` và, nếu khóa có mật khẩu, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` trong repo `cuong-under/CloginStudio`.
+3. Push tag dạng `vX.Y.Z`. Workflow `Release` kiểm tra tag khớp ba file version, build artifact, ký updater, và publish GitHub Release.
+4. Mở Admin Portal > **Releases** > **Nhập từ GitHub**, nhập `X.Y.Z`. API đọc artifact `.nsis.zip` và file `.nsis.zip.sig`, lưu URL trực tiếp và signature vào PostgreSQL.
+5. Xác nhận trạng thái **Auto-update: Sẵn sàng**, sau đó bấm **Publish Current**.
+
+Endpoint `GET /v1/app/update/manifest` chỉ trả JSON updater Tauri hợp lệ khi release Current có đủ URL HTTPS và signature. Nếu chưa có artifact thật, endpoint trả `204 No Content`, Desktop App sẽ không hiện bản update giả.
 
 ## Environment Variables
 
