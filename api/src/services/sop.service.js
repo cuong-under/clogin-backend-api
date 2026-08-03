@@ -49,12 +49,18 @@ class SopService {
     });
   }
 
-  async createVersion(workspaceId, { name, version, content_markdown = '', checklist = [] }) {
+  async createVersion(workspaceId, { name, version, content_markdown = '', checklist = [], created_by = null }) {
     if (!name || !String(name).trim()) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu tên SOP' };
     }
     if (!version || !String(version).trim()) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu version' };
+    }
+    if (typeof content_markdown !== 'string' || content_markdown.length > 100000) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Nội dung SOP không hợp lệ hoặc vượt quá giới hạn' };
+    }
+    if (!Array.isArray(checklist) || checklist.length > 500) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Checklist SOP không hợp lệ' };
     }
     const existing = await prisma.sopTemplate.findUnique({
       where: { workspace_id_name_version: { workspace_id: workspaceId, name: String(name), version: String(version) } }
@@ -71,7 +77,8 @@ class SopService {
         name: String(name).trim(),
         version: String(version).trim(),
         content_markdown,
-        checklist: Array.isArray(checklist) ? checklist : [],
+          checklist: Array.isArray(checklist) ? checklist : [],
+          created_by,
         is_active: !first
       }
     });

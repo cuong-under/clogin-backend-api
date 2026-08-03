@@ -1,6 +1,6 @@
-function sendError(res, statusCode, code, message) {
+function sendError(res, statusCode, code, message, details = {}) {
   res.status(statusCode).json({
-    error: { code, message }
+    error: { code, message, ...details }
   });
 }
 

@@ -445,8 +445,10 @@ router.delete(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin'
 
 router.get('/workspaces', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
-    const { page = 1, perPage = 20, search } = req.query;
-    const skip = (page - 1) * perPage;
+    const pageNumber = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const perPageNumber = Math.min(100, Math.max(1, Number.parseInt(req.query.perPage, 10) || 20));
+    const { search } = req.query;
+    const skip = (pageNumber - 1) * perPageNumber;
     const where = search ? { name: { contains: search, mode: 'insensitive' } } : {};
     const [rows, total] = await Promise.all([
       prisma.workspace.findMany({
@@ -457,7 +459,7 @@ router.get('/workspaces', requireRole(['super_admin', 'support', 'viewer']), asy
         },
         orderBy: { created_at: 'desc' },
         skip,
-        take: perPage
+        take: perPageNumber
       }),
       prisma.workspace.count({ where })
     ]);
@@ -477,7 +479,7 @@ router.get('/workspaces', requireRole(['super_admin', 'support', 'viewer']), asy
       created_at: w.created_at.toISOString(),
       updated_at: w.updated_at.toISOString()
     }));
-    return res.status(200).json({ data: workspaces, workspaces, total, page, per_page: perPage, total_pages: Math.ceil(total / perPage) });
+    return res.status(200).json({ data: workspaces, workspaces, total, page: pageNumber, per_page: perPageNumber, total_pages: Math.ceil(total / perPageNumber) });
   } catch (err) {
     next(err);
   }

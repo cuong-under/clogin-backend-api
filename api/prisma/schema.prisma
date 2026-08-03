@@ -307,6 +307,7 @@ model Workspace {
   sops            SopTemplate[]
   tasks           WorkspaceTask[]
   auditEvents     WorkspaceAuditEvent[]
+  taskActivities  TaskActivity[]
   vaultEntries    ProxyVaultEntry[]
   @@index([owner_id])
   @@map("workspaces")
@@ -340,6 +341,7 @@ model WorkspaceProfile {
   updated_at    DateTime  @updatedAt
   assignments   WorkspaceProfileAssignment[]
   taskLinks     TaskProfile[]
+  taskLinksV2   TaskWorkspaceProfileLink[]
   @@unique([workspace_id, profile_id])
   @@index([profile_id])
   @@map("workspace_profiles")
@@ -399,6 +401,8 @@ model WorkspaceTask {
   created_at      DateTime     @default(now())
   updated_at      DateTime     @updatedAt
   profiles        TaskProfile[]
+  profileLinks    TaskWorkspaceProfileLink[]
+  activities      TaskActivity[]
   @@index([workspace_id, status])
   @@index([workspace_id, assignee_type, assignee_id])
   @@index([due_at])
@@ -413,6 +417,40 @@ model TaskProfile {
   created_at           DateTime        @default(now())
   @@unique([task_id, workspace_profile_id])
   @@map("task_profiles")
+}
+
+// Replacement mapping for task profiles. TaskProfile remains untouched for
+// one release so existing installations can be backfilled safely.
+model TaskWorkspaceProfileLink {
+  id                  String          @id @default(uuid())
+  task_id             String
+  workspace_profile_id String
+  task                WorkspaceTask   @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  workspace_profile   WorkspaceProfile @relation(fields: [workspace_profile_id], references: [id], onDelete: Cascade)
+  created_at          DateTime        @default(now())
+  @@unique([task_id, workspace_profile_id])
+  @@index([task_id])
+  @@index([workspace_profile_id])
+  @@map("task_workspace_profile_links")
+}
+
+model TaskActivity {
+  id                  String        @id @default(uuid())
+  workspace_id        String
+  workspace            Workspace     @relation(fields: [workspace_id], references: [id], onDelete: Cascade)
+  task_id             String?
+  task                 WorkspaceTask? @relation(fields: [task_id], references: [id], onDelete: SetNull)
+  task_title_snapshot String
+  actor_id            String
+  actor_type          String
+  actor_name          String        @default("")
+  event_type          String
+  message             String        @default("")
+  metadata            Json?
+  created_at          DateTime      @default(now())
+  @@index([workspace_id, created_at])
+  @@index([task_id, created_at])
+  @@map("task_activities")
 }
 
 model WorkspaceAuditEvent {

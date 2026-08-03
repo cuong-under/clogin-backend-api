@@ -2,6 +2,17 @@ const { PrismaClient } = require('@prisma/client');
 const { hashPw } = require('../src/utils/hash');
 const prisma = new PrismaClient();
 
+async function assertDatabaseAvailable() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+  } catch (error) {
+    const message = error?.message || String(error);
+    const wrapped = new Error(`PostgreSQL test database không khả dụng: ${message}`);
+    wrapped.code = error?.code || 'DATABASE_UNAVAILABLE';
+    throw wrapped;
+  }
+}
+
 // Seed a fully usable owner + license + worker for tests.
 async function seedOwner(suffix) {
   const unique = `${process.pid}-${Date.now()}-${suffix}`;
@@ -51,4 +62,4 @@ async function cleanup(ownerId, licenses) {
   await prisma.owner.deleteMany({ where: { id: ownerId } }).catch(() => {});
 }
 
-module.exports = { seedOwner, login, auth, cleanup };;
+module.exports = { seedOwner, login, auth, cleanup, assertDatabaseAvailable };

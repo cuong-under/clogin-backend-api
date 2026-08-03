@@ -366,6 +366,20 @@ async function runMigration() {
   }
   console.log('[Backfill] Default workspace mapping complete.');
 
+  // 8. Backfill the additive multi-profile task link table. This operation is
+  // intentionally idempotent because startup migration may be retried.
+  console.log('[Migration] Backfilling task workspace-profile links...');
+  const legacyTaskProfiles = await prisma.taskProfile.findMany({
+    select: { task_id: true, workspace_profile_id: true }
+  });
+  if (legacyTaskProfiles.length) {
+    await prisma.taskWorkspaceProfileLink.createMany({
+      data: legacyTaskProfiles,
+      skipDuplicates: true
+    });
+  }
+  console.log(`[Backfill] Copied ${legacyTaskProfiles.length} legacy task profile mappings.`);
+
   console.log('--- Migration & Seeding Completed Successfully ---');
 }
 

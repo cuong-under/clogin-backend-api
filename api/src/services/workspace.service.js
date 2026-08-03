@@ -6,8 +6,22 @@ const {
   isValidCapability,
   isValidPreset
 } = require('../config/capabilities');
+const { CAPABILITIES } = require('../config/capabilities');
 
 class WorkspaceService {
+  async getWorkspaceOrThrow(workspaceId) {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+    if (!ws) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Workspace không tồn tại' };
+    return ws;
+  }
+
+  async bumpRevision(tx, workspaceId) {
+    await tx.workspace.update({
+      where: { id: workspaceId },
+      data: { policy_revision: { increment: 1 } }
+    });
+  }
+
   async listWorkspaces(actor) {
     if (actor.type === 'owner') {
       const rows = await prisma.workspace.findMany({
@@ -88,7 +102,10 @@ class WorkspaceService {
         _count: { select: { profiles: true, tasks: true, sops: true, auditEvents: true } }
       }
     });
+    if (!ws) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Workspace không tồn tại' };
     const formatted = this.formatWorkspace(ws);
+    formatted.role = auth.isOwner ? 'owner' : auth.role;
+    formatted.capabilities = auth.isOwner ? Object.values(CAPABILITIES) : [...auth.capabilities];
     formatted.members = ws.members.map(m => ({
       id: m.id,
       worker_id: m.worker_id,
@@ -103,9 +120,13 @@ class WorkspaceService {
     return formatted;
   }
 
-  async deleteWorkspace(auth, workspaceId) {
+  async deleteWorkspace(auth, workspaceId, confirmName) {
     if (!auth.isOwner) {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'Chỉ Owner mới xóa workspace' };
+    }
+    const ws = await this.getWorkspaceOrThrow(workspaceId);
+    if (confirmName !== ws.name) {
+      throw { statusCode: 400, code: 'CONFIRM_NAME_MISMATCH', message: 'Tên xác nhận workspace không khớp' };
     }
     await prisma.workspace.delete({ where: { id: workspaceId } });
     return { success: true };
@@ -116,14 +137,14 @@ class WorkspaceService {
   async listMembers(auth, workspaceId) {
     const ws = await prisma.workspace.findUnique({
       where: { id: workspaceId },
-      select: { owner_id: true }
+      select: { owner_id: true, owner: { select: { id: true, email: true, name: true } } }
     });
     const members = await prisma.workspaceMember.findMany({
       where: { workspace_id: workspaceId },
       include: { worker: { select: { id: true, email: true, name: true, active: true } } }
     });
     return {
-      owner: { id: ws.owner_id, role: 'owner' },
+      owner: { ...ws.owner, role: 'owner' },
       members: members.map(m => ({
         id: m.id,
         worker_id: m.worker_id,
@@ -187,21 +208,134 @@ class WorkspaceService {
     return { success: true, member_id: member.id };
   }
 
-  async deleteMember(workspaceId, workerId) {
-    await prisma.workspaceMember.deleteMany({
-      where: { workspace_id: workspaceId, worker_id: workerId }
+  async deleteMember(auth, workspaceId, workerId, reassignTo) {
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: workerId } },
+      include: { worker: { select: { id: true, name: true, email: true } } }
     });
-    await prisma.workspace.update({
-      where: { id: workspaceId },
-      data: { policy_revision: { increment: 1 } }
+    if (!member) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Member không tồn tại' };
+    const openTasks = await prisma.workspaceTask.findMany({
+      where: {
+        workspace_id: workspaceId,
+        assignee_type: 'worker',
+        assignee_id: workerId,
+        status: { notIn: ['done', 'cancelled'] }
+      },
+      select: { id: true, title: true, status: true }
     });
-    return { success: true };
+    if (openTasks.length && !reassignTo) {
+      throw {
+        statusCode: 409,
+        code: 'TASK_HANDOFF_REQUIRED',
+        message: 'Member còn task chưa hoàn tất, cần bàn giao trước khi gỡ',
+        tasks: openTasks,
+        assignees: await this.listValidAssignees(workspaceId, workerId)
+      };
+    }
+    const replacement = reassignTo ? await this.assertValidAssignee(workspaceId, reassignTo, workerId) : null;
+    await prisma.$transaction(async tx => {
+      for (const task of openTasks) {
+        await tx.workspaceTask.update({
+          where: { id: task.id },
+          data: { assignee_type: replacement.type, assignee_id: replacement.id }
+        });
+        await this.createActivity(tx, workspaceId, task, auth.actor, 'assignee_changed', {
+          metadata: {
+          before: { assignee_type: 'worker', assignee_id: workerId },
+          after: { assignee_type: replacement.type, assignee_id: replacement.id },
+          reason: 'member_removed'
+          }
+        });
+      }
+      await tx.workspaceMember.delete({ where: { id: member.id } });
+      await this.bumpRevision(tx, workspaceId);
+    });
+    return { success: true, handed_off_tasks: openTasks.length };
+  }
+
+  async deactivateMember(auth, workspaceId, workerId, active, reassignTo) {
+    if (active) {
+      const member = await prisma.workspaceMember.findUnique({
+        where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: workerId } }
+      });
+      if (!member) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Member không tồn tại' };
+      await prisma.workspaceMember.update({ where: { id: member.id }, data: { active: true } });
+      await this.bumpRevision(prisma, workspaceId);
+      return { success: true };
+    }
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: workerId } }
+    });
+    if (!member) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Member không tồn tại' };
+    const openTasks = await prisma.workspaceTask.findMany({
+      where: { workspace_id: workspaceId, assignee_type: 'worker', assignee_id: workerId, status: { notIn: ['done', 'cancelled'] } },
+      select: { id: true, title: true, status: true }
+    });
+    if (openTasks.length && !reassignTo) {
+      throw {
+        statusCode: 409,
+        code: 'TASK_HANDOFF_REQUIRED',
+        message: 'Member còn task chưa hoàn tất, cần bàn giao trước khi khóa',
+        tasks: openTasks,
+        assignees: await this.listValidAssignees(workspaceId, workerId)
+      };
+    }
+    const replacement = reassignTo ? await this.assertValidAssignee(workspaceId, reassignTo, workerId) : null;
+    await prisma.$transaction(async tx => {
+      for (const task of openTasks) {
+        await tx.workspaceTask.update({ where: { id: task.id }, data: { assignee_type: replacement.type, assignee_id: replacement.id } });
+        await this.createActivity(tx, workspaceId, task, auth.actor, 'assignee_changed', {
+          metadata: {
+          before: { assignee_type: 'worker', assignee_id: workerId },
+          after: { assignee_type: replacement.type, assignee_id: replacement.id },
+          reason: 'member_deactivated'
+          }
+        });
+      }
+      await tx.workspaceMember.update({ where: { id: member.id }, data: { active: false } });
+      await this.bumpRevision(tx, workspaceId);
+    });
+    return { success: true, handed_off_tasks: openTasks.length };
+  }
+
+  async listValidAssignees(workspaceId, excludeWorkerId) {
+    const ws = await this.getWorkspaceOrThrow(workspaceId);
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspace_id: workspaceId, active: true, worker_id: excludeWorkerId ? { not: excludeWorkerId } : undefined },
+      include: { worker: { select: { id: true, name: true, email: true, active: true } } }
+    });
+    return [
+      { type: 'owner', id: ws.owner_id, name: 'Owner' },
+      ...members.filter(m => m.worker.active).map(m => ({ type: 'worker', id: m.worker_id, name: m.worker.name || m.worker.email }))
+    ];
+  }
+
+  async assertValidAssignee(workspaceId, value, excludeWorkerId) {
+    const type = value.type || value.assignee_type;
+    const id = value.id || value.assignee_id;
+    const ws = await this.getWorkspaceOrThrow(workspaceId);
+    if (type === 'owner' && id === ws.owner_id) return { type, id };
+    if (type !== 'worker' || !id || id === excludeWorkerId) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Assignee thay thế không hợp lệ' };
+    }
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: id } },
+      include: { worker: { select: { active: true } } }
+    });
+    if (!member || !member.active || !member.worker.active) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Assignee thay thế phải là member active' };
+    }
+    return { type, id };
   }
 
   // ----- Profiles ---
   async listWorkspaceProfiles(auth, workspaceId) {
+    const canSeeAll = auth.isOwner || auth.capabilities.has('profiles.assign');
     const rows = await prisma.workspaceProfile.findMany({
-      where: { workspace_id: workspaceId },
+      where: {
+        workspace_id: workspaceId,
+        ...(canSeeAll ? {} : { assignments: { some: { worker_id: auth.actor.sub } } })
+      },
       include: {
         profile: { select: { id: true, name: true, folder: true, sync_revision: true, sync_state: true } },
         assignments: { include: { worker: { select: { id: true, email: true, name: true } } } }
@@ -223,18 +357,44 @@ class WorkspaceService {
     };
   }
 
-  async addProfileToWorkspace(workspaceId, profileId) {
-    const profile = await prisma.cloudProfile.findUnique({ where: { id: profileId } });
+  async addProfileToWorkspace(auth, workspaceId, profileId, confirmReuse = false) {
+    const profile = await prisma.cloudProfile.findFirst({ where: { id: profileId, owner_id: auth.actor.sub } });
     if (!profile) {
       throw { statusCode: 404, code: 'NOT_FOUND', message: 'Profile cloud không tồn tại' };
     }
-    const ws = await prisma.workspaceProfile.create({
-      data: { workspace_id: workspaceId, profile_id: profileId }
+    const linked = await prisma.workspaceProfile.findMany({
+      where: { profile_id: profileId, workspace_id: { not: workspaceId } },
+      include: { workspace: { select: { id: true, name: true } } }
+    });
+    if (linked.length && !confirmReuse) {
+      throw {
+        statusCode: 409,
+        code: 'PROFILE_REUSE_CONFIRMATION_REQUIRED',
+        message: 'Profile đã được liên kết với workspace khác',
+        workspaces: linked.map(row => row.workspace)
+      };
+    }
+    const ws = await prisma.workspaceProfile.upsert({
+      where: { workspace_id_profile_id: { workspace_id: workspaceId, profile_id: profileId } },
+      create: { workspace_id: workspaceId, profile_id: profileId },
+      update: {}
     });
     return { workspace_profile_id: ws.id };
   }
 
-  async removeProfileFromWorkspace(workspaceId, wpId) {
+  async removeProfileFromWorkspace(auth, workspaceId, wpId) {
+    const activeLinks = await prisma.taskWorkspaceProfileLink.findMany({
+      where: { workspace_profile_id: wpId, task: { workspace_id: workspaceId, status: { notIn: ['done', 'cancelled'] } } },
+      select: { task: { select: { id: true, title: true, status: true } } }
+    });
+    if (activeLinks.length) {
+      throw {
+        statusCode: 409,
+        code: 'PROFILE_IN_ACTIVE_TASK',
+        message: 'Profile đang được dùng bởi task chưa hoàn tất',
+        tasks: activeLinks.map(row => row.task)
+      };
+    }
     await prisma.workspaceProfile.deleteMany({
       where: { id: wpId, workspace_id: workspaceId }
     });
@@ -246,7 +406,7 @@ class WorkspaceService {
     const member = await prisma.workspaceMember.findUnique({
       where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: workerId } }
     });
-    if (!member) {
+    if (!member || !member.active) {
       throw { statusCode: 404, code: 'NOT_FOUND', message: 'Worker chưa là thành viên workspace' };
     }
     const wpRows = await prisma.workspaceProfile.findMany({
@@ -269,6 +429,37 @@ class WorkspaceService {
       data: { policy_revision: { increment: 1 } }
     });
     return { success: true, assigned: ids.length };
+  }
+
+  async removeProfileAssignments(auth, workspaceId, workerId, ids = []) {
+    const member = await prisma.workspaceMember.findUnique({
+      where: { workspace_id_worker_id: { workspace_id: workspaceId, worker_id: workerId } }
+    });
+    if (!member) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Worker chưa là thành viên workspace' };
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu profile_ids' };
+    }
+    await prisma.workspaceProfileAssignment.deleteMany({
+      where: { worker_id: workerId, workspace_profile_id: { in: ids }, workspace_profile: { workspace_id: workspaceId } }
+    });
+    await this.bumpRevision(prisma, workspaceId);
+    return { success: true, removed: ids.length };
+  }
+
+  async createActivity(tx, workspaceId, task, actor, eventType, { message = '', metadata = null } = {}) {
+    return tx.taskActivity.create({
+      data: {
+        workspace_id: workspaceId,
+        task_id: task?.id || null,
+        task_title_snapshot: task?.title || '',
+        actor_id: actor?.sub || 'system',
+        actor_type: actor?.type || 'system',
+        actor_name: actor?.name || '',
+        event_type: eventType,
+        message: String(message || '').slice(0, 2000),
+        metadata
+      }
+    });
   }
 
   async listAssignments(workerId) {
