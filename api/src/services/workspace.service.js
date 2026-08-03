@@ -29,7 +29,13 @@ class WorkspaceService {
         include: { _count: { select: { members: true, profiles: true, tasks: true } } },
         orderBy: { created_at: 'desc' }
       });
-      return rows.map(this.formatWorkspace);
+      // Owner nhìn thấy toàn quyền trên mọi workspace của mình; kèm role/capabilities
+      // để desktop UI bật đúng nút quản trị (khớp với getWorkspace).
+      return rows.map(w => ({
+        ...this.formatWorkspace(w),
+        role: 'owner',
+        capabilities: Object.values(CAPABILITIES)
+      }));
     }
 
     const memberships = await prisma.workspaceMember.findMany({
