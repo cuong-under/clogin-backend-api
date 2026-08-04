@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Users as UsersIcon, Search, Key, Shield, KeyRound, Ban, Trash2, Edit, RefreshCw } from 'lucide-react';
+import { Users as UsersIcon, Search, Key, Shield, KeyRound, Ban, Trash2, Edit, RefreshCw, Layers } from 'lucide-react';
 import { api } from '@/lib/api';
-import { OwnerUser, WorkerUser, CloudProfile, LoginHistoryEntry, PaginatedResponse } from '@/lib/types';
+import { OwnerUser, WorkerUser, CloudProfile, LoginHistoryEntry, PaginatedResponse, WorkspaceSummaryRow } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -28,10 +28,11 @@ export default function OwnersPage() {
 
   // Detail Modal State
   const [selectedOwner, setSelectedOwner] = useState<OwnerUser | null>(null);
-  const [detailTab, setDetailTab] = useState<'workers' | 'profiles' | 'logins'>('workers');
+  const [detailTab, setDetailTab] = useState<'workers' | 'profiles' | 'logins' | 'workspaces'>('workers');
   const [ownerWorkers, setOwnerWorkers] = useState<WorkerUser[]>([]);
   const [ownerProfiles, setOwnerProfiles] = useState<CloudProfile[]>([]);
   const [ownerLogins, setOwnerLogins] = useState<LoginHistoryEntry[]>([]);
+  const [ownerWorkspaces, setOwnerWorkspaces] = useState<WorkspaceSummaryRow[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Edit Modal
@@ -70,14 +71,16 @@ export default function OwnersPage() {
     setSelectedOwner(owner);
     setLoadingDetails(true);
     try {
-      const [wRes, pRes, lRes] = await Promise.all([
+      const [wRes, pRes, lRes, wsRes] = await Promise.all([
         api.get<{ data: WorkerUser[] }>(`/v1/admin/users/owners/${owner.id}/workers`).catch(() => ({ data: [] })),
         api.get<{ data: CloudProfile[] }>(`/v1/admin/users/owners/${owner.id}/profiles`).catch(() => ({ data: [] })),
         api.get<{ data: LoginHistoryEntry[] }>(`/v1/admin/users/owners/${owner.id}/logins`).catch(() => ({ data: [] })),
+        api.get<{ data: WorkspaceSummaryRow[] }>(`/v1/admin/users/owners/${owner.id}/workspaces`).catch(() => ({ data: [] })),
       ]);
       setOwnerWorkers(wRes.data || []);
       setOwnerProfiles(pRes.data || []);
       setOwnerLogins(lRes.data || []);
+      setOwnerWorkspaces(wsRes.data || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -314,6 +317,7 @@ export default function OwnersPage() {
               tabs={[
                 { id: 'workers', label: 'Danh sách Workers', count: ownerWorkers.length },
                 { id: 'profiles', label: 'Cloud Profiles', count: ownerProfiles.length },
+                { id: 'workspaces', label: 'Workspaces', count: ownerWorkspaces.length, icon: <Layers className="w-4 h-4" /> },
                 { id: 'logins', label: 'Lịch sử đăng nhập', count: ownerLogins.length },
               ]}
             />
@@ -356,6 +360,58 @@ export default function OwnersPage() {
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500 italic py-4 text-center">Không có Cloud Profile nào</p>
+                )}
+              </div>
+            )}
+
+            {detailTab === 'workspaces' && (
+              <div className="space-y-2">
+                {ownerWorkspaces.length > 0 ? (
+                  <div className="border border-slate-700 rounded-lg overflow-hidden bg-slate-900/40">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-slate-400 border-b border-slate-700/60 bg-slate-900/80">
+                            <th className="px-3 py-2 font-semibold">Workspace</th>
+                            <th className="px-3 py-2 font-semibold">Trạng thái</th>
+                            <th className="px-3 py-2 font-semibold">Thành viên</th>
+                            <th className="px-3 py-2 font-semibold">Profile</th>
+                            <th className="px-3 py-2 font-semibold">Task</th>
+                            <th className="px-3 py-2 font-semibold">SOP</th>
+                            <th className="px-3 py-2 font-semibold">Policy</th>
+                            <th className="px-3 py-2 font-semibold">Ngày tạo</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/60">
+                          {ownerWorkspaces.map((w) => (
+                            <tr key={w.id} className="hover:bg-slate-800/40">
+                              <td className="px-3 py-2">
+                                <span className="font-semibold text-slate-200">{w.name}</span>
+                                {w.description && (
+                                  <span className="block text-[11px] text-slate-500 truncate max-w-[220px]">{w.description}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {w.archived ? (
+                                  <Badge variant="danger">Archived</Badge>
+                                ) : (
+                                  <Badge variant="success">Hoạt động</Badge>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 font-mono text-slate-300">{w.member_count}</td>
+                              <td className="px-3 py-2 font-mono text-slate-300">{w.profile_count}</td>
+                              <td className="px-3 py-2 font-mono text-slate-300">{w.task_count}</td>
+                              <td className="px-3 py-2 font-mono text-slate-300">{w.sop_count}</td>
+                              <td className="px-3 py-2 font-mono text-slate-300">v{w.policy_revision}</td>
+                              <td className="px-3 py-2 text-slate-400">{formatDate(w.created_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic py-4 text-center">Owner chưa có Workspace nào</p>
                 )}
               </div>
             )}

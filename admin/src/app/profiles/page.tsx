@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FolderGit2, Trash2, ArrowRightLeft, Cookie, Code, Users } from 'lucide-react';
+import { FolderGit2, Trash2, ArrowRightLeft, Cookie, Code, Users, Layers } from 'lucide-react';
 import { api } from '@/lib/api';
-import { CloudProfile, OwnerUser, PaginatedResponse } from '@/lib/types';
+import { CloudProfile, OwnerUser, PaginatedResponse, ProfileWorkspaceMapping } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -27,6 +27,24 @@ export default function CloudProfilesPage() {
 
   // Detail Modal
   const [selectedProfile, setSelectedProfile] = useState<CloudProfile | null>(null);
+  const [profileWorkspaces, setProfileWorkspaces] = useState<ProfileWorkspaceMapping[]>([]);
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+
+  const loadProfileDetail = async (profile: CloudProfile) => {
+    setSelectedProfile(profile);
+    setLoadingWorkspaces(true);
+    setProfileWorkspaces([]);
+    try {
+      const res = await api
+        .get<{ data: ProfileWorkspaceMapping[] }>(`/v1/admin/profiles/${profile.id}/workspaces`)
+        .catch(() => ({ data: [] }));
+      setProfileWorkspaces(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingWorkspaces(false);
+    }
+  };
 
   // Transfer Owner Modal
   const [transferProfile, setTransferProfile] = useState<CloudProfile | null>(null);
@@ -141,7 +159,7 @@ export default function CloudProfilesPage() {
       header: 'Hành động',
       cell: (item) => (
         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedProfile(item)}>
+          <Button variant="ghost" size="sm" onClick={() => loadProfileDetail(item)}>
             Xem
           </Button>
           <Button
@@ -181,7 +199,7 @@ export default function CloudProfilesPage() {
         <SearchBar value={search} onChange={setSearch} placeholder="Tìm profile theo tên, folder..." className="w-full sm:w-80" />
       </div>
 
-      <Table columns={columns} data={profiles} loading={loading} onRowClick={(item) => setSelectedProfile(item)} />
+      <Table columns={columns} data={profiles} loading={loading} onRowClick={(item) => loadProfileDetail(item)} />
       <Pagination page={page} totalPages={totalPages} totalItems={totalItems} onPageChange={setPage} />
 
       {/* Transfer Owner Modal */}
@@ -261,6 +279,38 @@ export default function CloudProfilesPage() {
               <p className="text-xs text-slate-300 bg-slate-900 p-3 rounded-lg border border-slate-700">
                 {selectedProfile.cookies_info || 'Dữ liệu Cookie được mã hóa an toàn trên Cloud Storage.'}
               </p>
+            </div>
+
+            {/* Workspace mapping */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold uppercase text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-sky-400" /> Workspace Mapping
+              </h4>
+
+              {loadingWorkspaces ? (
+                <p className="text-xs text-slate-500 italic py-4 text-center">Đang tải...</p>
+              ) : profileWorkspaces.length > 0 ? (
+                <div className="divide-y divide-slate-700/60 border border-slate-700 rounded-lg overflow-hidden bg-slate-900/40">
+                  {profileWorkspaces.map((p) => (
+                    <div key={p.workspace_id} className="p-3 flex items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <span className="font-semibold text-slate-200">{p.workspace_name}</span>
+                        {p.workspace_archived && (
+                          <Badge variant="danger" className="ml-2">Archived</Badge>
+                        )}
+                        {p.vault_proxy_id && (
+                          <span className="block text-[11px] font-mono text-slate-500 mt-0.5">
+                            Vault proxy: {p.vault_proxy_id}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-400 shrink-0">{formatDate(p.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 italic py-4 text-center">Chưa thuộc Workspace nào</p>
+              )}
             </div>
           </div>
         </Modal>

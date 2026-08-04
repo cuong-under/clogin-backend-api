@@ -18,9 +18,51 @@ export interface DashboardStats {
   active_users: number;
   cloud_profiles: number;
   active_devices: number;
+  total_workspaces?: number;
+  archived_workspaces?: number;
+  total_workspace_members?: number;
+  total_tasks?: number;
+  active_tasks?: number;
+  overdue_tasks?: number;
+  total_sops?: number;
+  total_vault_entries?: number;
+  ai_audit_events_24h?: number;
+  ai_audit_denied_24h?: number;
   logins_by_day: { date: string; count: number }[];
   new_users_by_day: { date: string; count: number }[];
   recent_activity: AuditEntry[];
+}
+
+export interface WorkspaceSummaryRow {
+  id: string;
+  name: string;
+  description: string;
+  archived: boolean;
+  policy_revision: number;
+  member_count: number;
+  profile_count: number;
+  task_count: number;
+  audit_count: number;
+  sop_count: number;
+  created_at: string;
+}
+
+export interface WorkerMembership {
+  workspace_id: string;
+  workspace_name: string;
+  workspace_archived: boolean;
+  preset_role: 'operator' | 'manager' | 'auditor' | string;
+  capabilities: string[];
+  active: boolean;
+  member_created_at: string;
+}
+
+export interface ProfileWorkspaceMapping {
+  workspace_id: string;
+  workspace_name: string;
+  workspace_archived: boolean;
+  vault_proxy_id: string | null;
+  created_at: string;
 }
 
 export interface LicenseDevice {

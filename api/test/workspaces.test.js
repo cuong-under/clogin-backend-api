@@ -16,6 +16,11 @@ before(async () => {
   try {
     await assertDatabaseAvailable();
   } catch (error) {
+    // Fail-hard khi chạy CI hoặc STRICT_TEST=1: PostgreSQL không khả dụng phải
+    // throw thay vì silent skip để tránh báo cáo PASS giả trên CI.
+    if (process.env.CI || process.env.STRICT_TEST === '1') {
+      throw error;
+    }
     console.warn(`[Workspace tests skipped] ${error.message}`);
     return;
   }

@@ -7,6 +7,9 @@ class AnalyticsService {
     if (range === '30d') days = 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    const last24h = new Date(Date.now() - 86400000);
+    const now = new Date();
+
     const [
       totalLicenses,
       activeLicenses,
@@ -19,7 +22,17 @@ class AnalyticsService {
       recentAuditCount,
       recentAuditLogs,
       recentLogins,
-      recentOwners
+      recentOwners,
+      totalWorkspaces,
+      archivedWorkspaces,
+      totalWorkspaceMembers,
+      totalTasks,
+      activeTasks,
+      overdueTasks,
+      totalSops,
+      totalVaultEntries,
+      aiAuditEvents24h,
+      aiAuditDenied24h
     ] = await Promise.all([
       prisma.license.count(),
       prisma.license.count({ where: { status: 'active' } }),
@@ -30,7 +43,7 @@ class AnalyticsService {
       prisma.worker.count(),
       prisma.cloudProfile.count(),
       prisma.auditLog.count({
-        where: { timestamp: { gte: new Date(Date.now() - 86400000) } }
+        where: { timestamp: { gte: last24h } }
       }),
       prisma.auditLog.findMany({
         orderBy: { timestamp: 'desc' },
@@ -43,6 +56,20 @@ class AnalyticsService {
       prisma.owner.findMany({
         where: { created_at: { gte: startDate } },
         select: { created_at: true }
+      }),
+      prisma.workspace.count({ where: { archived_at: null } }),
+      prisma.workspace.count({ where: { archived_at: { not: null } } }),
+      prisma.workspaceMember.count(),
+      prisma.workspaceTask.count(),
+      prisma.workspaceTask.count({ where: { status: { notIn: ['done', 'cancelled'] } } }),
+      prisma.workspaceTask.count({
+        where: { due_at: { lt: now }, status: { notIn: ['done', 'cancelled'] } }
+      }),
+      prisma.sopTemplate.count({ where: { is_active: true } }),
+      prisma.proxyVaultEntry.count(),
+      prisma.workspaceAuditEvent.count({ where: { created_at: { gte: last24h } } }),
+      prisma.workspaceAuditEvent.count({
+        where: { created_at: { gte: last24h }, status: 'denied' }
       })
     ]);
 
@@ -88,6 +115,16 @@ class AnalyticsService {
       active_users: totalOwners,
       cloud_profiles: totalProfiles,
       active_devices: totalDevices,
+      total_workspaces: totalWorkspaces,
+      archived_workspaces: archivedWorkspaces,
+      total_workspace_members: totalWorkspaceMembers,
+      total_tasks: totalTasks,
+      active_tasks: activeTasks,
+      overdue_tasks: overdueTasks,
+      total_sops: totalSops,
+      total_vault_entries: totalVaultEntries,
+      ai_audit_events_24h: aiAuditEvents24h,
+      ai_audit_denied_24h: aiAuditDenied24h,
       logins_by_day,
       new_users_by_day,
       recent_activity,
@@ -100,7 +137,17 @@ class AnalyticsService {
         total_owners: totalOwners,
         total_workers: totalWorkers,
         total_profiles: totalProfiles,
-        audit_events_24h: recentAuditCount
+        audit_events_24h: recentAuditCount,
+        total_workspaces: totalWorkspaces,
+        archived_workspaces: archivedWorkspaces,
+        total_workspace_members: totalWorkspaceMembers,
+        total_tasks: totalTasks,
+        active_tasks: activeTasks,
+        overdue_tasks: overdueTasks,
+        total_sops: totalSops,
+        total_vault_entries: totalVaultEntries,
+        ai_audit_events_24h: aiAuditEvents24h,
+        ai_audit_denied_24h: aiAuditDenied24h
       }
     };
   }

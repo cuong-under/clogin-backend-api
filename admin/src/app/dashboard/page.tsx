@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Key, Users, FolderGit2, Smartphone, RefreshCw, Activity, ArrowUpRight } from 'lucide-react';
+import { Key, Users, FolderGit2, Smartphone, RefreshCw, Activity, ArrowUpRight, Layers, ClipboardList, BookOpen, ShieldAlert } from 'lucide-react';
 import { api } from '@/lib/api';
 import { DashboardStats, AuditEntry } from '@/lib/types';
 import { MetricCard } from '@/components/ui/MetricCard';
@@ -107,6 +107,42 @@ export default function DashboardPage() {
           change="Ổn định"
           changeType="neutral"
           icon={<Smartphone className="w-5 h-5" />}
+          loading={loading}
+        />
+      </div>
+
+      {/* Workspace / Task / SOP / AI Audit Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard
+          title="Workspaces"
+          value={stats?.total_workspaces ?? 0}
+          change={`${stats?.archived_workspaces ?? 0} đã archive`}
+          changeType="neutral"
+          icon={<Layers className="w-5 h-5" />}
+          loading={loading}
+        />
+        <MetricCard
+          title="Task đang xử lý"
+          value={stats?.active_tasks ?? 0}
+          change={`${stats?.overdue_tasks ?? 0} quá hạn`}
+          changeType={stats?.overdue_tasks ? 'decrease' : 'neutral'}
+          icon={<ClipboardList className="w-5 h-5" />}
+          loading={loading}
+        />
+        <MetricCard
+          title="SOP đang áp dụng"
+          value={stats?.total_sops ?? 0}
+          change={`${stats?.total_tasks ?? 0} tổng task`}
+          changeType="neutral"
+          icon={<BookOpen className="w-5 h-5" />}
+          loading={loading}
+        />
+        <MetricCard
+          title="AI Audit 24h"
+          value={stats?.ai_audit_events_24h ?? 0}
+          change={`${stats?.ai_audit_denied_24h ?? 0} bị từ chối`}
+          changeType={stats?.ai_audit_denied_24h ? 'decrease' : 'neutral'}
+          icon={<ShieldAlert className="w-5 h-5" />}
           loading={loading}
         />
       </div>

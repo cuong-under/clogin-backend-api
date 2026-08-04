@@ -21,6 +21,65 @@ const upstreamService = require('../services/upstream.service');
 const ADMIN_DEFAULT_EMAIL = process.env.ADMIN_DEFAULT_EMAIL || 'admin@clogin.nghemmo.com';
 const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || process.env.ADMIN_PASSWORD || 'CloginAdmin2026!';
 
+function formatWorkspaceRow(w) {
+  return {
+    id: w.id,
+    name: w.name,
+    description: w.description,
+    archived: !!w.archived_at,
+    policy_revision: w.policy_revision,
+    member_count: w._count ? w._count.members : (w.member_count || 0),
+    profile_count: w._count ? w._count.profiles : (w.profile_count || 0),
+    task_count: w._count ? w._count.tasks : (w.task_count || 0),
+    audit_count: w._count ? w._count.auditEvents : (w.audit_count || 0),
+    sop_count: w._count ? w._count.sops : (w.sop_count || 0),
+    created_at: w.created_at.toISOString()
+  };
+}
+
+async function listOwnerWorkspaces(ownerId) {
+  const rows = await prisma.workspace.findMany({
+    where: { owner_id: ownerId },
+    include: {
+      _count: { select: { members: true, profiles: true, tasks: true, auditEvents: true, sops: true } }
+    },
+    orderBy: { created_at: 'desc' }
+  });
+  return rows.map(formatWorkspaceRow);
+}
+
+async function listWorkerMemberships(workerId) {
+  const rows = await prisma.workspaceMember.findMany({
+    where: { worker_id: workerId },
+    include: { workspace: true },
+    orderBy: { created_at: 'desc' }
+  });
+  return rows.map(m => ({
+    workspace_id: m.workspace_id,
+    workspace_name: m.workspace.name,
+    workspace_archived: !!m.workspace.archived_at,
+    preset_role: m.preset_role,
+    capabilities: m.capabilities,
+    active: m.active,
+    member_created_at: m.created_at.toISOString()
+  }));
+}
+
+async function listProfileWorkspaces(profileId) {
+  const rows = await prisma.workspaceProfile.findMany({
+    where: { profile_id: profileId },
+    include: { workspace: true },
+    orderBy: { created_at: 'desc' }
+  });
+  return rows.map(p => ({
+    workspace_id: p.workspace_id,
+    workspace_name: p.workspace.name,
+    workspace_archived: !!p.workspace.archived_at,
+    vault_proxy_id: p.vault_proxy_id || null,
+    created_at: p.created_at.toISOString()
+  }));
+}
+
 // ==================== ADMIN AUTH ====================
 
 router.post('/auth/login', async (req, res, next) => {
@@ -358,6 +417,13 @@ router.get(['/users/owners/:id/logins', '/owners/:id/logins'], requireRole(['sup
   } catch (err) { next(err); }
 });
 
+router.get(['/users/owners/:id/workspaces', '/owners/:id/workspaces'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const workspaces = await listOwnerWorkspaces(req.params.id);
+    return res.status(200).json({ data: workspaces, workspaces });
+  } catch (err) { next(err); }
+});
+
 router.post(['/users/owners/:id/reset-password', '/owners/:id/reset-password'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const newPassword = req.body.password || req.body.new_password || ('Clogin' + Math.floor(100000 + Math.random() * 900000));
@@ -385,7 +451,8 @@ router.get(['/users/owners', '/owners'], requireRole(['super_admin', 'support', 
 router.get(['/users/owners/:id', '/owners/:id'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const owner = await userService.getOwnerById(req.params.id);
-    return res.status(200).json({ data: owner, owner });
+    const workspaces = await listOwnerWorkspaces(req.params.id);
+    return res.status(200).json({ data: { ...owner, workspaces }, owner: { ...owner, workspaces } });
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
@@ -412,6 +479,13 @@ router.post(['/users/workers/:id/toggle-status', '/workers/:id/toggle-status'], 
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
+router.get(['/users/workers/:id/memberships', '/workers/:id/memberships'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const memberships = await listWorkerMemberships(req.params.id);
+    return res.status(200).json({ data: memberships, memberships });
+  } catch (err) { next(err); }
+});
+
 router.get(['/users/workers', '/workers'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const { page, perPage } = parsePagination(req.query);
@@ -423,7 +497,8 @@ router.get(['/users/workers', '/workers'], requireRole(['super_admin', 'support'
 router.get(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const worker = await userService.getWorkerById(req.params.id);
-    return res.status(200).json({ data: worker, worker });
+    const memberships = await listWorkerMemberships(req.params.id);
+    return res.status(200).json({ data: { ...worker, memberships }, worker: { ...worker, memberships } });
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
@@ -555,6 +630,13 @@ router.get('/profiles', requireRole(['super_admin', 'support', 'viewer']), async
   } catch (err) { next(err); }
 });
 
+router.get('/profiles/:id/workspaces', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
+  try {
+    const workspaces = await listProfileWorkspaces(req.params.id);
+    return res.status(200).json({ data: workspaces, workspaces });
+  } catch (err) { next(err); }
+});
+
 router.post('/profiles/:id/transfer', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await profileService.transferProfile(req.params.id, req.body.new_owner_id || req.body.owner_id);
@@ -565,7 +647,8 @@ router.post('/profiles/:id/transfer', requireRole(['super_admin', 'support']), a
 router.get('/profiles/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const profile = await profileService.getProfileByIdAdmin(req.params.id);
-    return res.status(200).json({ data: profile, profile });
+    const workspaces = await listProfileWorkspaces(req.params.id);
+    return res.status(200).json({ data: { ...profile, workspaces }, profile: { ...profile, workspaces } });
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });
 
