@@ -1,7 +1,8 @@
 const crypto = require('crypto');
+const { requireSecret } = require('./env');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'clogin-jwt-secret-2026';
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'clogin-admin-jwt-secret-2026';
+const JWT_SECRET = requireSecret('JWT_SECRET', 'clogin-jwt-secret-dev-only');
+const ADMIN_JWT_SECRET = requireSecret('ADMIN_JWT_SECRET', 'clogin-admin-jwt-secret-dev-only');
 
 const USER_TTL = 3600; // 1 hour
 const ADMIN_TTL = 86400; // 24 hours

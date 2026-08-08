@@ -3,14 +3,23 @@ const prisma = new PrismaClient();
 const { hashPw, verifyPw } = require('../utils/hash');
 const { signUserJwt } = require('../utils/jwt');
 
+const PASSWORD_RULE = 'Mật khẩu phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ cái và 1 chữ số';
+
+function validatePassword(password) {
+  if (!password) {
+    throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu' };
+  }
+  if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+    throw { statusCode: 400, code: 'VALIDATION_ERROR', message: PASSWORD_RULE };
+  }
+}
+
 class UserService {
   async registerOwner({ email, password, license_key }) {
     if (!email) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập địa chỉ email' };
     }
-    if (!password) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu' };
-    }
+    validatePassword(password);
     if (!license_key) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập License Key kích hoạt' };
     }
@@ -213,9 +222,7 @@ class UserService {
     if (!email) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập email tài khoản Worker' };
     }
-    if (!password) {
-      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập mật khẩu cho Worker' };
-    }
+    validatePassword(password);
 
     const owner = await prisma.owner.findUnique({ where: { id: ownerId } });
     if (!owner) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Owner không tồn tại' };
@@ -260,7 +267,10 @@ class UserService {
 
     const data = {};
     if (name !== undefined) data.name = name;
-    if (password) data.password_hash = hashPw(password);
+    if (password) {
+      validatePassword(password);
+      data.password_hash = hashPw(password);
+    }
     if (active !== undefined) data.active = active;
 
     await prisma.worker.update({
@@ -350,7 +360,10 @@ class UserService {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.max_worker_slots !== undefined) updateData.max_worker_slots = data.max_worker_slots;
     if (data.active !== undefined) updateData.active = data.active;
-    if (data.password) updateData.password_hash = hashPw(data.password);
+    if (data.password) {
+      validatePassword(data.password);
+      updateData.password_hash = hashPw(data.password);
+    }
 
     return prisma.owner.update({
       where: { id },
@@ -364,7 +377,7 @@ class UserService {
   }
 
   async resetOwnerPassword(id, newPassword) {
-    if (!newPassword) throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu mật khẩu mới' };
+    validatePassword(newPassword);
     await prisma.owner.update({
       where: { id },
       data: { password_hash: hashPw(newPassword) }
@@ -424,7 +437,10 @@ class UserService {
     const updateData = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.active !== undefined) updateData.active = data.active;
-    if (data.password) updateData.password_hash = hashPw(data.password);
+    if (data.password) {
+      validatePassword(data.password);
+      updateData.password_hash = hashPw(data.password);
+    }
 
     return prisma.worker.update({
       where: { id },

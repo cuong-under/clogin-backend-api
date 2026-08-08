@@ -36,7 +36,7 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow for mobile/desktop agents
+      callback(new Error('Origin not allowed by CORS'));
     }
   },
   credentials: true,

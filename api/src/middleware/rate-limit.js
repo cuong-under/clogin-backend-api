@@ -3,11 +3,13 @@ const { sendError } = require('./error');
 
 const rateLimitStore = new Map();
 
-function createRateLimiter(name, maxHits, windowMs, errorMessage) {
+// keyFn(req) trả về định danh của yêu cầu (mặc định: IP client).
+// Dùng keyFn cho endpoint đã xác thực để limiting theo user thay vì IP.
+function createRateLimiter(name, maxHits, windowMs, errorMessage, keyFn) {
   return (req, res, next) => {
-    const ip = getClientIp(req);
+    const identity = keyFn ? keyFn(req) : getClientIp(req);
     const now = Date.now();
-    const key = `${ip}:${name}`;
+    const key = `${identity}:${name}`;
     const record = rateLimitStore.get(key) || { count: 0, resetAt: now + windowMs };
 
     if (now > record.resetAt) {

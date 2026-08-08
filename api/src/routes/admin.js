@@ -7,7 +7,9 @@ const { signAdminJwt } = require('../utils/jwt');
 const { verifyPw } = require('../utils/hash');
 const { adminAuth, requireRole } = require('../middleware/admin-auth');
 const { sendError } = require('../middleware/error');
+const { createRateLimiter } = require('../middleware/rate-limit');
 const { getClientIp, parsePagination } = require('../utils/validators');
+const { requireSecret } = require('../utils/env');
 
 const licenseService = require('../services/license.service');
 const userService = require('../services/user.service');
@@ -18,8 +20,14 @@ const analyticsService = require('../services/analytics.service');
 const systemService = require('../services/system.service');
 const upstreamService = require('../services/upstream.service');
 
-const ADMIN_DEFAULT_EMAIL = process.env.ADMIN_DEFAULT_EMAIL || 'admin@clogin.nghemmo.com';
-const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || process.env.ADMIN_PASSWORD || 'CloginAdmin2026!';
+const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
+const ADMIN_DEFAULT_PASSWORD = requireSecret('ADMIN_DEFAULT_PASSWORD', 'CloginAdmin2026!');
+const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+
+// Giới hạn theo IP cho login admin (5 req/phút).
+const adminLoginLimiter = createRateLimiter('admin-login', 5, 60000, 'Quá nhiều lần đăng nhập quản trị, vui lòng thử lại sau 1 phút');
+// Giới hạn theo user (keyFn = admin id) cho các endpoint đã xác thực (60 req/phút).
+const adminApiLimiter = createRateLimiter('admin-api', 60, 60000, 'Quá nhiều yêu cầu, vui lòng thử lại sau 1 phút', (req) => req.admin?.sub || getClientIp(req));
 
 function formatWorkspaceRow(w) {
   return {
@@ -82,7 +90,7 @@ async function listProfileWorkspaces(profileId) {
 
 // ==================== ADMIN AUTH ====================
 
-router.post('/auth/login', async (req, res, next) => {
+router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -145,13 +153,13 @@ router.post('/auth/login', async (req, res, next) => {
 });
 
 // Legacy single-password login endpoint compatibility
-router.post('/login', async (req, res, next) => {
+router.post('/login', adminLoginLimiter, async (req, res, next) => {
   try {
     const { password, email } = req.body;
     const inputEmail = email || ADMIN_DEFAULT_EMAIL;
     const inputPassword = password;
 
-    if (inputPassword === ADMIN_DEFAULT_PASSWORD || inputPassword === (process.env.ADMIN_PASSWORD || 'CloginAdmin2026!')) {
+    if (inputPassword === ADMIN_DEFAULT_PASSWORD || (ADMIN_PASSWORD_ENV && inputPassword === ADMIN_PASSWORD_ENV)) {
       const token = signAdminJwt({ sub: 'super-admin-root', email: inputEmail, role: 'super_admin' });
       res.cookie('clogin_admin_token', token, { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true });
       res.cookie('clogin_admin_session', token, { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true });
@@ -182,6 +190,8 @@ router.get('/auth/me', adminAuth, (req, res) => {
 
 // Apply adminAuth to all remaining endpoints
 router.use(adminAuth);
+// Rate limit chung cho các endpoint đã xác thực (theo admin user).
+router.use(adminApiLimiter);
 
 // ==================== DASHBOARD ====================
 

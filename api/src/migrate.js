@@ -4,9 +4,10 @@ const path = require('path');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { hashPw } = require('./utils/hash');
+const { requireSecret } = require('./utils/env');
 
-const ADMIN_DEFAULT_EMAIL = process.env.ADMIN_DEFAULT_EMAIL || 'admin@clogin.nghemmo.com';
-const ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || process.env.ADMIN_PASSWORD || 'CloginAdmin2026!';
+const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
+const ADMIN_DEFAULT_PASSWORD = requireSecret('ADMIN_DEFAULT_PASSWORD', 'CloginAdmin2026!');
 
 function loadJsonFile(fp) {
   try {

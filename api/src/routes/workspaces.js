@@ -16,10 +16,20 @@ const vaultService = require('../services/vault.service');
 const { CAPABILITIES } = require('../config/capabilities');
 const { createGrant, verifyGrant, sha256, TTL_MS } = require('../utils/grant');
 const { sendError } = require('../middleware/error');
+const { createRateLimiter } = require('../middleware/rate-limit');
+const { getClientIp } = require('../utils/validators');
 
 const ACTION_CLASSES = ['read', 'write', 'destructive', 'sensitive'];
 
 router.use(authMw);
+
+// Rate limit các request ghi theo user (keyFn = user id), 10 req/phút.
+const writeLimiter = createRateLimiter('ws-write', 10, 60000, 'Quá nhiều yêu cầu ghi, vui lòng thử lại sau 1 phút', (req) => req.user?.sub || getClientIp(req));
+
+router.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  return writeLimiter(req, res, next);
+});
 
 // ---------- Workspace CRUD ----------
 router.get('/', async (req, res, next) => {

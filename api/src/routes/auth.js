@@ -9,6 +9,7 @@ const { signUserJwt } = require('../utils/jwt');
 
 const registerLimiter = createRateLimiter('register', 3, 3600000, 'Quá nhiều lần thử đăng ký, vui lòng thử lại sau 1 giờ');
 const loginLimiter = createRateLimiter('login', 10, 900000, 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 15 phút');
+const refreshLimiter = createRateLimiter('refresh', 10, 900000, 'Quá nhiều lần refresh token, vui lòng thử lại sau 15 phút');
 
 router.post('/register', registerLimiter, async (req, res, next) => {
   try {
@@ -48,7 +49,7 @@ router.get('/me', authMw, async (req, res, next) => {
   }
 });
 
-router.post('/refresh', authMw, (req, res) => {
+router.post('/refresh', authMw, refreshLimiter, (req, res) => {
   const { sub, type, owner_id } = req.user;
   const token = signUserJwt({ sub, type, owner_id });
   return res.status(200).json({ token });
