@@ -300,11 +300,14 @@ class LicenseService {
     return { success: true, message: 'Đã reset toàn bộ thiết bị của Key' };
   }
 
-  async removeDevice(id, hwid) {
+  async removeDevice(id, target) {
     await prisma.device.deleteMany({
       where: {
         license_id: id,
-        hwid
+        OR: [
+          { id: target },
+          { hwid: target }
+        ]
       }
     });
     return { success: true, message: 'Đã giải phóng thiết bị khỏi Key' };
