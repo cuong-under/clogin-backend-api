@@ -142,15 +142,18 @@ export default function LicensesPage() {
     }
   };
 
-  const handleRemoveDevice = async (licenseId: string, deviceId: string) => {
+  const handleRemoveDevice = async (licenseId: string, targetId: string) => {
     try {
-      await api.delete(`/v1/admin/licenses/${licenseId}/devices/${deviceId}`);
+      await api.delete(`/v1/admin/licenses/${licenseId}/devices/${targetId}`);
       toast.success('Đã ngắt kết nối thiết bị');
       if (selectedLicense) {
+        const updatedDevices = selectedLicense.devices?.filter(
+          (d) => d.id !== targetId && d.hwid !== targetId && d.device_id !== targetId
+        );
         setSelectedLicense({
           ...selectedLicense,
-          devices: selectedLicense.devices?.filter((d) => d.id !== deviceId),
-          active_devices_count: Math.max(0, selectedLicense.active_devices_count - 1),
+          devices: updatedDevices,
+          active_devices_count: Math.max(0, (updatedDevices?.length ?? 0)),
         });
       }
       fetchLicenses();
