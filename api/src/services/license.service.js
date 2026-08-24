@@ -295,15 +295,18 @@ class LicenseService {
     });
   }
 
-  async resetDevices(id) {
-    await prisma.device.deleteMany({ where: { license_id: id } });
+  async resetDevices(idOrKey) {
+    const lic = await prisma.license.findFirst({
+      where: { OR: [{ id: idOrKey }, { key: idOrKey }] }
+    });
+    const targetLicId = lic ? lic.id : idOrKey;
+    await prisma.device.deleteMany({ where: { license_id: targetLicId } });
     return { success: true, message: 'Đã reset toàn bộ thiết bị của Key' };
   }
 
-  async removeDevice(id, target) {
+  async removeDevice(idOrKey, target) {
     await prisma.device.deleteMany({
       where: {
-        license_id: id,
         OR: [
           { id: target },
           { hwid: target }
