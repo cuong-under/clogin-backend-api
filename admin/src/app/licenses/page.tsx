@@ -142,6 +142,23 @@ export default function LicensesPage() {
     }
   };
 
+  const handleResetDevices = async (licenseId: string) => {
+    try {
+      await api.post(`/v1/admin/licenses/${licenseId}/reset-devices`);
+      toast.success('Đã reset toàn bộ thiết bị');
+      if (selectedLicense) {
+        setSelectedLicense({
+          ...selectedLicense,
+          devices: [],
+          active_devices_count: 0,
+        });
+      }
+      fetchLicenses();
+    } catch (err: any) {
+      toast.error(err.message || 'Lỗi khi reset thiết bị');
+    }
+  };
+
   const handleRemoveDevice = async (licenseId: string, targetId: string) => {
     try {
       await api.delete(`/v1/admin/licenses/${licenseId}/devices/${targetId}`);
@@ -471,9 +488,21 @@ export default function LicensesPage() {
 
             {/* Devices List */}
             <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-sky-400" /> Danh sách thiết bị đã kích hoạt
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-sky-400" /> Danh sách thiết bị đã kích hoạt
+                </h4>
+                {selectedLicense.devices && selectedLicense.devices.length > 0 && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleResetDevices(selectedLicense.id)}
+                    className="text-xs py-1 px-2"
+                  >
+                    Reset toàn bộ thiết bị
+                  </Button>
+                )}
+              </div>
               {selectedLicense.devices && selectedLicense.devices.length > 0 ? (
                 <div className="divide-y divide-slate-700/60 border border-slate-700 rounded-lg overflow-hidden bg-slate-900/50">
                   {selectedLicense.devices.map((dev) => (
