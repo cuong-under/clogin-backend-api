@@ -88,10 +88,10 @@ export default function LicensePlansPage() {
     try {
       if (editingPlan) {
         await api.put(`/v1/admin/licenses/plans/${editingPlan.id}`, form);
-        toast.success('ÄÃ£ cáº­p nháº­t gói cước');
+        toast.success('Đã cập nhật gói cước');
       } else {
         await api.post('/v1/admin/licenses/plans', form);
-        toast.success('ÄÃ£ táº¡o gói cước má»›i');
+        toast.success('Đã tạo gói cước mới');
       }
       setIsOpen(false);
       fetchPlans();
@@ -107,7 +107,7 @@ export default function LicensePlansPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/licenses/plans/${deleteId}`);
-      toast.success('ÄÃ£ xÃ³a gói cước');
+      toast.success('Đã xóa gói cước');
       setDeleteId(null);
       fetchPlans();
     } catch (err: any) {
@@ -120,7 +120,7 @@ export default function LicensePlansPage() {
   const handleToggleActive = async (plan: LicensePlan) => {
     try {
       await api.put(`/v1/admin/licenses/plans/${plan.id}`, { active: !plan.active });
-      toast.success(`ÄÃ£ ${!plan.active ? 'kích hoạt' : 'ẩn'} gói cước ${plan.name}`);
+      toast.success(`Đã ${!plan.active ? 'kích hoạt' : 'ẩn'} gói cước ${plan.name}`);
       fetchPlans();
     } catch (err: any) {
       toast.error(err.message || 'Không thể cập nhật trạng thái');
@@ -155,7 +155,7 @@ export default function LicensePlansPage() {
       ),
     },
     {
-      header: 'Thá»i háº¡n',
+      header: 'Thời hạn',
       hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-300">{item.duration_days} ngày</span>,
     },
@@ -165,11 +165,11 @@ export default function LicensePlansPage() {
         <button onClick={() => handleToggleActive(item)} className="cursor-pointer">
           {item.active ? (
             <Badge variant="success" className="gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Äang bÃ¡n
+              <CheckCircle2 className="w-3 h-3" /> Đang bán
             </Badge>
           ) : (
             <Badge variant="danger" className="gap-1">
-              <XCircle className="w-3 h-3" /> ÄÃ£ ẩn
+              <XCircle className="w-3 h-3" /> Đã ẩn
             </Badge>
           )}
         </button>
@@ -278,7 +278,7 @@ export default function LicensePlansPage() {
               required
             />
             <Input
-              label="Thá»i háº¡n (Sá»‘ ngày)"
+              label="Thời hạn (Số ngày)"
               type="number"
               value={form.duration_days}
               onChange={(e) => setForm({ ...form, duration_days: parseInt(e.target.value) || 30 })}
@@ -295,7 +295,7 @@ export default function LicensePlansPage() {
         onConfirm={handleDelete}
         isLoading={deleting}
         title="Xóa Gói Cước"
-        message="Báº¡n cÃ³ cháº¯c cháº¯n muá»‘n xÃ³a gói cước nÃ y? Thao tÃ¡c khÃ´ng thá»ƒ hoÃ n tÃ¡c."
+        message="Bạn có chắc chắn muốn xóa gói cước này? Thao tác không thể hoàn tác."
       />
     </div>
   );

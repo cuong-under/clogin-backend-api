@@ -71,7 +71,7 @@ export default function CouponsPage() {
     setSubmitting(true);
     try {
       await api.post('/v1/admin/licenses/coupons', form);
-      toast.success('ÄÃ£ táº¡o MÃ£ Giáº£m GiÃ¡ má»›i');
+      toast.success('Đã tạo Mã Giảm Giá mới');
       setIsOpen(false);
       fetchCoupons();
     } catch (err: any) {
@@ -86,7 +86,7 @@ export default function CouponsPage() {
     setDeleting(true);
     try {
       await api.delete(`/v1/admin/licenses/coupons/${deleteId}`);
-      toast.success('ÄÃ£ xÃ³a Coupon');
+      toast.success('Đã xóa Coupon');
       setDeleteId(null);
       fetchCoupons();
     } catch (err: any) {
@@ -98,7 +98,7 @@ export default function CouponsPage() {
 
   const handleCopy = async (code: string) => {
     const ok = await copyToClipboard(code);
-    if (ok) toast.success('ÄÃ£ sao chÃ©p mÃ£ Coupon');
+    if (ok) toast.success('Đã sao chép mã Coupon');
   };
 
   const columns: Column<Coupon>[] = [
@@ -120,7 +120,7 @@ export default function CouponsPage() {
       cell: (item) => <Badge variant="warning">{item.discount_percent}%</Badge>,
     },
     {
-      header: 'Ãp dá»¥ng cho gÃ³i',
+      header: 'Áp dụng cho gói',
       hideOnMobile: true,
       cell: (item) => <span className="text-xs text-slate-300">{item.plan_name || 'Tất cả các gói'}</span>,
     },
@@ -136,7 +136,7 @@ export default function CouponsPage() {
     {
       header: 'Trạng thái',
       cell: (item) =>
-        item.active ? <Badge variant="success">Hoạt động</Badge> : <Badge variant="danger">ÄÃ£ khÃ³a</Badge>,
+        item.active ? <Badge variant="success">Hoạt động</Badge> : <Badge variant="danger">Đã khóa</Badge>,
     },
     {
       header: 'Hạn dùng',
