@@ -234,7 +234,63 @@ class UpstreamService {
     const config = await this.getConfig();
     const headers = await this.getHeaders(config);
 
-    // Kích hoạt workflow sync-upstream.yml
+    // 1. Kiểm tra xem đã có Pull Request sync nào đang mở sẵn chưa
+    try {
+      const pullsRes = await fetch(`https://api.github.com/repos/${config.origin_repo}/pulls?state=open&per_page=10`, { headers });
+      if (pullsRes.ok) {
+        const pulls = await pullsRes.json();
+        const existingPr = pulls.find(p =>
+          p.title?.toLowerCase().includes('sync') ||
+          p.head?.ref?.toLowerCase().includes('sync')
+        );
+        if (existingPr) {
+          return {
+            success: true,
+            pr_number: existingPr.number,
+            pr_url: existingPr.html_url,
+            message: `Đang có Pull Request #${existingPr.number} mở trên GitHub: "${existingPr.title}"`
+          };
+        }
+      }
+    } catch (err) {
+      // bỏ qua lỗi kiểm tra PR
+    }
+
+    // 2. Kiểm tra xem có nhánh sync/upstream-* nào gần đây đã được push mà chưa có PR không
+    try {
+      const branchesRes = await fetch(`https://api.github.com/repos/${config.origin_repo}/branches?per_page=30`, { headers });
+      if (branchesRes.ok) {
+        const branches = await branchesRes.json();
+        const syncBranches = branches.filter(b => b.name && b.name.startsWith('sync/upstream-'));
+        if (syncBranches.length > 0) {
+          const latestSyncBranch = syncBranches[syncBranches.length - 1].name;
+          const prCreateRes = await fetch(`https://api.github.com/repos/${config.origin_repo}/pulls`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              title: `Sync Upstream: Cập nhật từ ${config.upstream_repo}`,
+              head: latestSyncBranch,
+              base: config.target_branch,
+              body: `Tự động tạo Pull Request đồng bộ các cập nhật mới nhất từ kho nguồn ${config.upstream_repo}.\n\n- Đã bảo tồn toàn bộ thương hiệu và kiến trúc Clogin Studio.\n- Tích hợp các tính năng và bản vá mới nhất từ Upstream.`
+            })
+          });
+
+          if (prCreateRes.ok) {
+            const newPr = await prCreateRes.json();
+            return {
+              success: true,
+              pr_number: newPr.number,
+              pr_url: newPr.html_url,
+              message: `Đã tạo Pull Request #${newPr.number} thành công từ nhánh ${latestSyncBranch}!`
+            };
+          }
+        }
+      }
+    } catch (err) {
+      // Tiếp tục fallback sang workflow dispatch
+    }
+
+    // 3. Dispatch workflow sync-upstream.yml
     try {
       const listWfUrl = `https://api.github.com/repos/${config.origin_repo}/actions/workflows`;
       const listRes = await fetch(listWfUrl, { headers });
@@ -256,7 +312,7 @@ class UpstreamService {
         if (wfRes.status === 204) {
           return {
             success: true,
-            message: `Đã kích hoạt GitHub Action (${syncWf ? syncWf.name : 'Sync Upstream'}) tự động gộp code từ ${config.upstream_repo} và tạo Pull Request!`,
+            message: `Đã kích hoạt GitHub Actions (${syncWf ? syncWf.name : 'Sync Upstream'}) để tự động merge và tạo Pull Request!`,
             via_workflow: true,
             action_url: `https://github.com/${config.origin_repo}/actions/workflows/${wfId}`
           };
