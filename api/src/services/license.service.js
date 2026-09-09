@@ -305,14 +305,21 @@ class LicenseService {
   }
 
   async removeDevice(idOrKey, target) {
-    await prisma.device.deleteMany({
-      where: {
-        OR: [
-          { id: target },
-          { hwid: target }
-        ]
+    const where = {
+      OR: [
+        { id: target },
+        { hwid: target }
+      ]
+    };
+    if (idOrKey) {
+      const lic = await prisma.license.findFirst({
+        where: { OR: [{ id: idOrKey }, { key: idOrKey }] }
+      });
+      if (lic) {
+        where.license_id = lic.id;
       }
-    });
+    }
+    await prisma.device.deleteMany({ where });
     return { success: true, message: 'Đã giải phóng thiết bị khỏi Key' };
   }
 

@@ -161,7 +161,7 @@ export default function LicensesPage() {
 
   const handleRemoveDevice = async (licenseId: string, targetId: string) => {
     try {
-      await api.delete(`/v1/admin/licenses/${licenseId}/devices/${targetId}`);
+      await api.delete(`/v1/admin/licenses/${licenseId}/devices/${encodeURIComponent(targetId)}`);
       toast.success('Đã ngắt kết nối thiết bị');
       if (selectedLicense) {
         const updatedDevices = selectedLicense.devices?.filter(
@@ -514,7 +514,7 @@ export default function LicensesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRemoveDevice(selectedLicense.id, dev.hwid || dev.id)}
+                        onClick={() => handleRemoveDevice(selectedLicense.id, dev.id || dev.hwid || dev.device_id)}
                         className="text-rose-400 hover:bg-rose-500/10 py-0.5 px-2 text-xs"
                       >
                         Ngắt kết nối

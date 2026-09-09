@@ -68,6 +68,7 @@ export interface ProfileWorkspaceMapping {
 export interface LicenseDevice {
   id: string;
   device_id: string;
+  hwid?: string;
   device_name: string;
   os: string;
   ip: string;
