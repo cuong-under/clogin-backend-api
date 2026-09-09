@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   GitPullRequest,
   RefreshCw,
@@ -11,10 +11,11 @@ import {
   Settings,
   ExternalLink,
   Play,
-  Key,
   GitFork,
   Clock,
-  Layers
+  Layers,
+  Loader2,
+  XCircle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { UpstreamStatus, UpstreamConfig, UpstreamCommit } from '@/lib/types';
@@ -43,8 +44,10 @@ export default function UpstreamSyncPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
 
-  const fetchStatusAndCommits = async () => {
-    setLoading(true);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchStatusAndCommits = async (isPolling = false) => {
+    if (!isPolling) setLoading(true);
     try {
       const [statusRes, commitsRes, configRes] = await Promise.all([
         api.get<UpstreamStatus>('/v1/admin/upstream/status').catch(() => null),
@@ -52,18 +55,43 @@ export default function UpstreamSyncPage() {
         api.get<{ data: UpstreamConfig }>('/v1/admin/upstream/config').catch(() => null)
       ]);
 
-      if (statusRes) setStatus(statusRes);
+      if (statusRes) {
+        setStatus(statusRes);
+        // Nếu có workflow đang chạy (in_progress / queued), duy trì auto-poll mỗi 5 giây
+        const isWorkflowRunning =
+          statusRes.latest_workflow_run?.status === 'in_progress' ||
+          statusRes.latest_workflow_run?.status === 'queued';
+
+        if (isWorkflowRunning) {
+          if (!pollTimerRef.current) {
+            pollTimerRef.current = setTimeout(() => {
+              pollTimerRef.current = null;
+              fetchStatusAndCommits(true);
+            }, 5000);
+          }
+        } else if (pollTimerRef.current) {
+          clearTimeout(pollTimerRef.current);
+          pollTimerRef.current = null;
+        }
+      }
       if (commitsRes?.data) setCommits(commitsRes.data);
       if (configRes?.data) setConfig(configRes.data);
     } catch (err: any) {
-      toast.error(err.message || 'Không thể tải dữ liệu Upstream');
+      if (!isPolling) {
+        toast.error(err.message || 'Không thể tải dữ liệu Upstream');
+      }
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchStatusAndCommits();
+    return () => {
+      if (pollTimerRef.current) {
+        clearTimeout(pollTimerRef.current);
+      }
+    };
   }, []);
 
   const handleSaveConfig = async (e: React.FormEvent) => {
@@ -84,16 +112,23 @@ export default function UpstreamSyncPage() {
   const handleCreateSyncPR = async () => {
     setActionLoading(true);
     try {
-      const res = await api.post<{ pr_url?: string; pr_number?: number; message?: string }>('/v1/admin/upstream/create-pr');
-      if (res.pr_number) {
+      const res = await api.post<{
+        pr_url?: string;
+        pr_number?: number;
+        message?: string;
+        action_url?: string;
+        via_workflow?: boolean;
+      }>('/v1/admin/upstream/create-pr');
+
+      if (res.pr_number && res.pr_url) {
         toast.success(`Đã tạo Sync Pull Request #${res.pr_number} thành công!`);
-        if (res.pr_url) {
-          window.open(res.pr_url, '_blank');
-        }
+        window.open(res.pr_url, '_blank');
+      } else if (res.via_workflow) {
+        toast.success(res.message || 'Đã kích hoạt GitHub Actions để tự động đồng bộ code!');
       } else {
         toast.success(res.message || 'Đã đồng bộ trực tiếp từ Upstream thành công!');
-        fetchStatusAndCommits();
       }
+      fetchStatusAndCommits();
     } catch (err: any) {
       toast.error(err.message || 'Không thể tạo Pull Request');
     } finally {
@@ -114,8 +149,19 @@ export default function UpstreamSyncPage() {
     }
   };
 
+  const isWorkflowRunning =
+    status?.latest_workflow_run?.status === 'in_progress' ||
+    status?.latest_workflow_run?.status === 'queued';
+
   const getStatusBadge = () => {
     if (!status) return <Badge variant="default">Unknown</Badge>;
+    if (isWorkflowRunning) {
+      return (
+        <Badge variant="info" className="gap-1 animate-pulse">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang chạy Sync Action...
+        </Badge>
+      );
+    }
     switch (status.status) {
       case 'UP_TO_DATE':
         return (
@@ -167,7 +213,7 @@ export default function UpstreamSyncPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchStatusAndCommits}
+            onClick={() => fetchStatusAndCommits()}
             isLoading={loading}
             icon={<RefreshCw className="w-4 h-4" />}
           >
@@ -178,10 +224,10 @@ export default function UpstreamSyncPage() {
             variant="outline"
             size="sm"
             onClick={handleCreateSyncPR}
-            isLoading={actionLoading}
+            isLoading={actionLoading || isWorkflowRunning}
             icon={<GitPullRequest className="w-4 h-4" />}
           >
-            Tạo Sync PR
+            {isWorkflowRunning ? 'Đang chạy Sync...' : 'Tạo Sync PR'}
           </Button>
 
           <Button
@@ -196,6 +242,93 @@ export default function UpstreamSyncPage() {
         </div>
       </div>
 
+      {/* Active Pull Request Alert Card */}
+      {status?.active_pr && (
+        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <GitPullRequest className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-emerald-300">
+                  Có Pull Request đồng bộ đang mở: #{status.active_pr.number}
+                </h4>
+                <Badge variant="success" className="text-[10px]">Open PR</Badge>
+              </div>
+              <p className="text-xs text-emerald-200/80 mt-1 font-mono">
+                {status.active_pr.title}
+              </p>
+              <p className="text-[11px] text-emerald-300/60 mt-0.5">
+                Nhánh nguồn: <span className="font-mono">{status.active_pr.head || 'sync/upstream'}</span> &bull; Tạo {formatTimeAgo(status.active_pr.created_at)}
+              </p>
+            </div>
+          </div>
+          <a
+            href={status.active_pr.html_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0"
+          >
+            <Button size="sm" variant="outline" className="text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/10 gap-1.5 text-xs">
+              Xem & Merge Trên GitHub <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </a>
+        </div>
+      )}
+
+      {/* Running GitHub Actions Workflow Banner */}
+      {isWorkflowRunning && (
+        <div className="p-4 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 text-sky-400 animate-spin shrink-0" />
+            <div>
+              <h4 className="text-sm font-semibold text-sky-300">GitHub Actions đang chạy tác vụ đồng bộ</h4>
+              <p className="text-xs text-sky-200/80 mt-0.5">
+                Hệ thống đang merge code từ {config.upstream_repo}, tự động bảo vệ branding Clogin và chuẩn bị Pull Request...
+              </p>
+            </div>
+          </div>
+          {status?.latest_workflow_run?.html_url && (
+            <a
+              href={status.latest_workflow_run.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
+              <Button size="sm" variant="outline" className="text-sky-300 border-sky-500/30 hover:bg-sky-500/10 gap-1.5 text-xs">
+                Xem Runner Trực Tiếp <ExternalLink className="w-3.5 h-3.5" />
+              </Button>
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* Failed GitHub Action Workflow Alert */}
+      {!isWorkflowRunning && status?.latest_workflow_run?.conclusion === 'failure' && !status?.active_pr && (
+        <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="text-sm font-semibold text-rose-300">Lần chạy GitHub Action gần nhất thất bại</h4>
+              <p className="text-xs text-rose-200/80 mt-0.5">
+                Lần chạy lúc {formatDate(status.latest_workflow_run.created_at)} không thành công. Bạn có thể kiểm tra log runner để xem chi tiết hoặc bấm &quot;Tạo Sync PR&quot; để chạy lại bản vá mới.
+              </p>
+            </div>
+          </div>
+          {status.latest_workflow_run.html_url && (
+            <a
+              href={status.latest_workflow_run.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0"
+            >
+              <Button size="sm" variant="outline" className="text-rose-300 border-rose-500/30 hover:bg-rose-500/10 gap-1.5 text-xs">
+                Xem Chi Tiết Lỗi <ExternalLink className="w-3.5 h-3.5" />
+              </Button>
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Metric Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="p-4 border border-slate-800 bg-slate-900/60">
@@ -205,7 +338,7 @@ export default function UpstreamSyncPage() {
           </div>
           <div className="mt-2">
             <p className="text-sm font-semibold text-slate-200 truncate">{config.upstream_repo}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Branch: {config.target_branch}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Branch: main</p>
           </div>
         </Card>
 
@@ -216,7 +349,7 @@ export default function UpstreamSyncPage() {
           </div>
           <div className="mt-2">
             <p className="text-sm font-semibold text-slate-200 truncate">{config.origin_repo}</p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Branch: {config.target_branch}</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">Target: {config.target_branch}</p>
           </div>
         </Card>
 
@@ -248,13 +381,13 @@ export default function UpstreamSyncPage() {
       </div>
 
       {/* Warning Alert if Behind */}
-      {status?.behind_by ? status.behind_by > 0 && (
+      {status?.behind_by ? status.behind_by > 0 && !status.active_pr && (
         <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-amber-300">Kho nguồn Upstream có bản cập nhật mới</h4>
             <p className="text-xs text-amber-200/80 mt-1">
-              Đang có {status.behind_by} commit mới trên repo gốc `{config.upstream_repo}`. Bạn nên bấm nút **"Tạo Sync PR"** để gộp các bản vá bảo mật và cải tiến antidetect mới nhất vào CloginStudio.
+              Đang có <strong>{status.behind_by}</strong> commit mới trên repo gốc <code className="text-amber-300">{config.upstream_repo}</code> (bao gồm Chrome 152 runtime, shardhelper, human type/mouse, spoofing và sửa lỗi). Bấm nút <strong>&quot;Tạo Sync PR&quot;</strong> để tạo nhánh và mở Pull Request đồng bộ.
             </p>
           </div>
         </div>
@@ -266,11 +399,13 @@ export default function UpstreamSyncPage() {
           <div>
             <h3 className="text-base font-semibold text-slate-200">Lịch Sử Commits Từ Upstream</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Danh sách các bản commit gần nhất từ repository gốc {config.upstream_repo}
+              {status?.behind_by && status.behind_by > 0
+                ? `Hiển thị ${status.behind_by} commit mới nhất từ ${config.upstream_repo} chưa có trong nhánh ${config.target_branch}`
+                : `Danh sách các bản commit gần nhất từ repository gốc ${config.upstream_repo}`}
             </p>
           </div>
           <a
-            href={`https://github.com/${config.upstream_repo}/commits/${config.target_branch}`}
+            href={`https://github.com/${config.upstream_repo}/commits/main`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium"

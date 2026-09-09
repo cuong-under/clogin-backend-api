@@ -262,6 +262,23 @@ export interface UpstreamStatus {
   total_commits?: number;
   message?: string;
   commits?: UpstreamCommit[];
+  latest_workflow_run?: {
+    id: number;
+    name: string;
+    status: string;
+    conclusion: string | null;
+    html_url: string;
+    created_at: string;
+    updated_at: string;
+  } | null;
+  active_pr?: {
+    number: number;
+    title: string;
+    html_url: string;
+    state: string;
+    head?: string;
+    created_at: string;
+  } | null;
 }
 
 export interface UpstreamCommit {

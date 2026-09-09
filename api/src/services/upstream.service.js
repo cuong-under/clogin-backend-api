@@ -55,47 +55,54 @@ class UpstreamService {
     const headers = await this.getHeaders(config);
 
     try {
-      // 1. Try official GitHub compare API (Works if GitHub Fork)
-      const upstreamOwner = config.upstream_repo.split('/')[0];
-      const compareUrl = `https://api.github.com/repos/${config.origin_repo}/compare/${config.target_branch}...${upstreamOwner}:${config.target_branch}`;
+      // 1. Lấy thông tin workflow run gần nhất và PRs đang mở
+      const [runsRes, pullsRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${config.origin_repo}/actions/workflows/sync-upstream.yml/runs?per_page=1`, { headers }).catch(() => null),
+        fetch(`https://api.github.com/repos/${config.origin_repo}/pulls?state=open&per_page=5`, { headers }).catch(() => null)
+      ]);
 
-      const res = await fetch(compareUrl, { headers });
-
-      if (res.status === 401 || res.status === 403) {
-        return {
-          status: 'UNAUTHORIZED',
-          behind_by: 0,
-          ahead_by: 0,
-          last_checked: new Date().toISOString(),
-          message: 'GitHub Access Token không hợp lệ hoặc thiếu quyền hạn'
-        };
+      let latestWorkflowRun = null;
+      if (runsRes && runsRes.ok) {
+        const runsData = await runsRes.json().catch(() => ({}));
+        const run = (runsData.workflow_runs || [])[0];
+        if (run) {
+          latestWorkflowRun = {
+            id: run.id,
+            name: run.name,
+            status: run.status,
+            conclusion: run.conclusion,
+            html_url: run.html_url,
+            created_at: run.created_at,
+            updated_at: run.updated_at
+          };
+        }
       }
 
-      if (res.ok) {
-        const data = await res.json();
-        return {
-          status: data.behind_by > 0 ? 'BEHIND' : 'UP_TO_DATE',
-          behind_by: data.behind_by || 0,
-          ahead_by: data.ahead_by || 0,
-          status_text: data.status,
-          last_checked: new Date().toISOString(),
-          total_commits: data.total_commits || 0,
-          commits: (data.commits || []).slice(0, 10).map(c => ({
-            sha: c.sha.substring(0, 7),
-            full_sha: c.sha,
-            message: c.commit.message,
-            author: c.commit.author?.name || c.author?.login || 'Unknown',
-            date: c.commit.author?.date,
-            html_url: c.html_url
-          }))
-        };
+      let activePr = null;
+      if (pullsRes && pullsRes.ok) {
+        const pullsData = await pullsRes.json().catch(() => []);
+        if (Array.isArray(pullsData)) {
+          const syncPr = pullsData.find(p =>
+            p.title?.toLowerCase().includes('sync') ||
+            p.head?.ref?.toLowerCase().includes('sync')
+          );
+          if (syncPr) {
+            activePr = {
+              number: syncPr.number,
+              title: syncPr.title,
+              html_url: syncPr.html_url,
+              state: syncPr.state,
+              head: syncPr.head?.ref,
+              created_at: syncPr.created_at
+            };
+          }
+        }
       }
 
-      // 2. Smart Fallback for Standalone/Non-Fork Repos:
-      // Fetch recent commits from both origin and upstream to accurately compute `behind_by`
+      // 2. Fetch danh sách commit của origin và upstream để tính toán độ lệch commit (behind_by)
       const [originRes, upstreamRes] = await Promise.all([
-        fetch(`https://api.github.com/repos/${config.origin_repo}/commits?per_page=100`, { headers }).catch(() => null),
-        fetch(`https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`, { headers }).catch(() => null)
+        fetch(`https://api.github.com/repos/${config.origin_repo}/commits?sha=${config.target_branch}&per_page=100`, { headers }).catch(() => null),
+        fetch(`https://api.github.com/repos/${config.upstream_repo}/commits?sha=main&per_page=100`, { headers }).catch(() => null)
       ]);
 
       if (upstreamRes && upstreamRes.ok) {
@@ -103,42 +110,50 @@ class UpstreamService {
         let originCommits = [];
         if (originRes && originRes.ok) {
           originCommits = await originRes.json();
-        } else if (originRes && (originRes.status === 401 || originRes.status === 403 || originRes.status === 404)) {
+        } else if (originRes && (originRes.status === 401 || originRes.status === 403)) {
           return {
             status: 'UNAUTHORIZED',
             behind_by: 0,
             ahead_by: 0,
             last_checked: new Date().toISOString(),
-            message: `Không thể đọc dữ liệu repo '${config.origin_repo}'. Vui lòng kiểm tra lại GitHub Token trong Cấu Hình.`
+            message: `Không có quyền truy cập repo '${config.origin_repo}'. Vui lòng kiểm tra lại GitHub Token trong Cấu Hình.`,
+            latest_workflow_run: latestWorkflowRun,
+            active_pr: activePr
           };
         }
 
         const originShas = new Set();
-        const originMessages = new Set();
+        const originSignatures = new Set();
 
         originCommits.forEach(c => {
           if (c.sha) {
             originShas.add(c.sha);
             originShas.add(c.sha.substring(0, 7));
           }
-          if (c.commit?.message) {
-            originMessages.add(c.commit.message.trim().toLowerCase());
+          const authorName = (c.commit?.author?.name || '').trim().toLowerCase();
+          const date = c.commit?.author?.date || '';
+          const msg = (c.commit?.message || '').trim().toLowerCase();
+          if (date) {
+            originSignatures.add(`${authorName}||${date}||${msg}`);
           }
         });
 
-        // Find the index of the first upstream commit that exists in origin
+        // Tìm commit đầu tiên của upstream đã xuất hiện trong lịch sử của origin
         let matchIndex = upstreamCommits.findIndex(c => {
           const uSha = c.sha;
           const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
-          const uCleanMsg = c.commit?.message ? c.commit.message.trim().toLowerCase() : '';
-          return originShas.has(uSha) || originShas.has(uShortSha) || (uCleanMsg && originMessages.has(uCleanMsg));
+          const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
+          const uDate = c.commit?.author?.date || '';
+          const uMsg = (c.commit?.message || '').trim().toLowerCase();
+          const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
+
+          return originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
         });
 
         let behindBy = 0;
         let status = 'UP_TO_DATE';
 
         if (matchIndex === -1) {
-          // No match found in recent history
           behindBy = upstreamCommits.length;
           status = 'BEHIND';
         } else if (matchIndex > 0) {
@@ -160,9 +175,12 @@ class UpstreamService {
             full_sha: c.sha,
             message: c.commit.message,
             author: c.commit.author?.name || c.author?.login || 'Unknown',
+            avatar_url: c.author?.avatar_url || '',
             date: c.commit.author?.date,
             html_url: c.html_url
-          }))
+          })),
+          latest_workflow_run: latestWorkflowRun,
+          active_pr: activePr
         };
       }
 
@@ -171,7 +189,9 @@ class UpstreamService {
         behind_by: 0,
         ahead_by: 0,
         last_checked: new Date().toISOString(),
-        message: 'Không thể kết nối đến GitHub API'
+        message: 'Không thể kết nối đến GitHub API',
+        latest_workflow_run: latestWorkflowRun,
+        active_pr: activePr
       };
     } catch (err) {
       return {
@@ -188,7 +208,7 @@ class UpstreamService {
     const config = await this.getConfig();
     const headers = await this.getHeaders(config);
 
-    const commitsUrl = `https://api.github.com/repos/${config.upstream_repo}/commits?per_page=20`;
+    const commitsUrl = `https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`;
     const res = await fetch(commitsUrl, { headers });
 
     if (!res.ok) {
@@ -214,10 +234,7 @@ class UpstreamService {
     const config = await this.getConfig();
     const headers = await this.getHeaders(config);
 
-    const upstreamOwner = config.upstream_repo.split('/')[0];
-    let debugInfo = [];
-
-    // Method 1: Look up existing workflows and trigger `sync-upstream.yml` or similar
+    // Kích hoạt workflow sync-upstream.yml
     try {
       const listWfUrl = `https://api.github.com/repos/${config.origin_repo}/actions/workflows`;
       const listRes = await fetch(listWfUrl, { headers });
@@ -239,90 +256,22 @@ class UpstreamService {
         if (wfRes.status === 204) {
           return {
             success: true,
-            message: `Đã kích hoạt GitHub Action (${syncWf ? syncWf.name : 'Sync Upstream'}) tự động gộp code từ ${config.upstream_repo}!`,
-            via_workflow: true
+            message: `Đã kích hoạt GitHub Action (${syncWf ? syncWf.name : 'Sync Upstream'}) tự động gộp code từ ${config.upstream_repo} và tạo Pull Request!`,
+            via_workflow: true,
+            action_url: `https://github.com/${config.origin_repo}/actions/workflows/${wfId}`
           };
         } else {
           const wfErr = await wfRes.json().catch(() => ({}));
-          debugInfo.push(`Workflow dispatch status ${wfRes.status}: ${wfErr.message || 'Workflow error'}`);
+          throw new Error(wfErr.message || `Workflow dispatch status ${wfRes.status}`);
         }
-      } else {
-        const listErr = await listRes.json().catch(() => ({}));
-        debugInfo.push(`List workflows status ${listRes.status}: ${listErr.message || 'Cannot list workflows'}`);
       }
     } catch (err) {
-      debugInfo.push(`Workflow dispatch failed: ${err.message}`);
-    }
-
-    // Method 2: Sync Fork directly via GitHub Merge Upstream API (Works if GitHub Fork)
-    try {
-      const mergeUpstreamUrl = `https://api.github.com/repos/${config.origin_repo}/merge-upstream`;
-      const mergeRes = await fetch(mergeUpstreamUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ branch: config.target_branch })
-      });
-
-      const mergeData = await mergeRes.json().catch(() => ({}));
-
-      if (mergeRes.ok) {
-        return {
-          success: true,
-          message: mergeData.message || `Đã đồng bộ trực tiếp từ ${config.upstream_repo} thành công!`,
-          merge_type: mergeData.merge_type || 'merged'
-        };
-      }
-
-      if (mergeRes.status === 409) {
-        throw {
-          statusCode: 409,
-          code: 'MERGE_CONFLICT',
-          message: 'Xung đột code (Merge Conflict) trên GitHub. Cần mở GitHub để resolve conflict thủ công.'
-        };
-      }
-      debugInfo.push(`Merge upstream status ${mergeRes.status}: ${mergeData.message || 'Not a fork'}`);
-    } catch (err) {
-      if (err.statusCode) throw err;
-      debugInfo.push(`Merge upstream failed: ${err.message}`);
-    }
-
-    // Method 3: Create a Pull Request from Upstream owner:branch
-    const url = `https://api.github.com/repos/${config.origin_repo}/pulls`;
-    const body = {
-      title: `sync: pull updates from upstream ${config.upstream_repo}`,
-      head: `${upstreamOwner}:${config.target_branch}`,
-      base: config.target_branch,
-      body: `Tự động tạo Pull Request đồng bộ cập nhật mới nhất từ kho nguồn ${config.upstream_repo} qua Clogin Admin Portal.`
-    };
-
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      const errorMsg = data.errors ? data.errors.map(e => e.message).join('. ') : (data.message || '');
-      if (res.status === 409 || errorMsg.includes('already exists')) {
-        throw { statusCode: 409, code: 'PR_EXISTS', message: 'Đã có Pull Request đồng bộ đang mở trên GitHub.' };
-      }
-
       throw {
         statusCode: 400,
         code: 'SYNC_FAILED',
-        message: `Không thể kích hoạt tự động. Lý do GitHub API: ${errorMsg || debugInfo.join(' | ') || 'Cần kiểm tra Token hoặc Workflow trên GitHub'}`
+        message: `Không thể kích hoạt GitHub Action: ${err.message || 'Lỗi không xác định'}`
       };
     }
-
-    return {
-      success: true,
-      pr_number: data.number,
-      pr_url: data.html_url,
-      title: data.title,
-      state: data.state
-    };
   }
 
   async triggerReleaseWorkflow() {
