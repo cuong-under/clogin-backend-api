@@ -86,6 +86,7 @@ export interface License {
   active_devices_count: number;
   status: LicenseStatus;
   valid_until: string;
+  expires_at?: string;
   created_at: string;
   notes?: string;
   devices?: LicenseDevice[];

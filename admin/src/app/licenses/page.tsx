@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Key, Copy, Plus, Filter, Trash2, Ban, CheckCircle, RefreshCw, Smartphone } from 'lucide-react';
+import { Key, Copy, Plus, Filter, Trash2, Ban, CheckCircle, RefreshCw, Smartphone, CalendarPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { License, LicensePlan, PaginatedResponse } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
@@ -44,6 +44,11 @@ export default function LicensesPage() {
 
   // Detail Modal
   const [selectedLicense, setSelectedLicense] = useState<License | null>(null);
+
+  // Extend License Modal
+  const [extendLicenseItem, setExtendLicenseItem] = useState<License | null>(null);
+  const [extendDays, setExtendDays] = useState<number>(30);
+  const [extending, setExtending] = useState(false);
 
   // Confirm Delete / Suspend
   const [confirmState, setConfirmState] = useState<{
@@ -179,7 +184,36 @@ export default function LicensesPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getProjectedExpiry = (currentExpiry: string | null | undefined, addDays: number) => {
+    const base = currentExpiry && new Date(currentExpiry) > new Date() ? new Date(currentExpiry) : new Date();
+    const target = new Date(base.getTime() + (addDays || 0) * 86400000);
+    return formatDateShort(target.toISOString());
+  };
+
+  const handleExtendLicense = async () => {
+    if (!extendLicenseItem) return;
+    setExtending(true);
+    try {
+      const days = Number(extendDays) || 30;
+      const updated = await api.post<any>(`/v1/admin/licenses/${extendLicenseItem.id}/extend`, { days });
+      toast.success(`Đã gia hạn thành công ${days} ngày cho License Key`);
+      if (selectedLicense && selectedLicense.id === extendLicenseItem.id) {
+        setSelectedLicense({
+          ...selectedLicense,
+          valid_until: updated.expires_at || selectedLicense.valid_until,
+                    status: updated.status || "active",
+        });
+      }
+      setExtendLicenseItem(null);
+      fetchLicenses();
+    } catch (err: any) {
+      toast.error(err.message || "Lỗi khi gia hạn License");
+    } finally {
+      setExtending(false);
+    }
+  };
+
+    const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
         return <Badge variant="success">Hoạt động</Badge>;
@@ -478,7 +512,19 @@ export default function LicensesPage() {
               </div>
               <div>
                 <span className="text-slate-400 block">Hạn sử dụng:</span>
-                <span className="font-semibold text-slate-200 mt-1 block">{formatDateShort(selectedLicense.valid_until)}</span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-semibold text-slate-200">{formatDateShort(selectedLicense.valid_until)}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setExtendDays(30);
+                      setExtendLicenseItem(selectedLicense);
+                    }}
+                    className="text-[11px] font-medium text-sky-400 hover:text-sky-300 underline"
+                  >
+                    Gia hạn
+                  </button>
+                </div>
               </div>
               <div>
                 <span className="text-slate-400 block">Chủ sở hữu:</span>
@@ -529,6 +575,86 @@ export default function LicensesPage() {
           </div>
         </Modal>
       )}
+
+      {/* Extend License Modal */}
+<Modal
+  isOpen={!!extendLicenseItem}
+  onClose={() => setExtendLicenseItem(null)}
+  title="Gia hạn thời hạn License Key"
+  footer={
+    <>
+      <Button variant="outline" size="sm" onClick={() => setExtendLicenseItem(null)}>
+        Hủy
+      </Button>
+      <Button variant="primary" size="sm" onClick={handleExtendLicense} isLoading={extending}>
+        Xác nhận gia hạn
+      </Button>
+    </>
+  }
+>
+  {extendLicenseItem && (
+    <div className="space-y-4">
+      <div className="p-3 bg-slate-900 border border-slate-700 rounded-lg text-xs space-y-1.5">
+        <div>
+          <span className="text-slate-400">License Key: </span>
+          <span className="font-mono text-sky-400 font-semibold">{extendLicenseItem.key}</span>
+        </div>
+        <div>
+          <span className="text-slate-400">Gói cước: </span>
+          <span className="text-slate-200 font-semibold">{extendLicenseItem.plan_name || "Standard"}</span>
+        </div>
+        <div>
+          <span className="text-slate-400">Hạn sử dụng hiện tại: </span>
+          <span className="text-slate-200 font-semibold">{formatDateShort(extendLicenseItem.valid_until)}</span>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-300 font-medium block mb-2">Chọn nhanh thời gian gia hạn</label>
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { label: "+30 ngày", days: 30 },
+            { label: "+90 ngày", days: 90 },
+            { label: "+180 ngày", days: 180 },
+            { label: "+365 ngày", days: 365 },
+          ].map((item) => (
+            <button
+              key={item.days}
+              type="button"
+              onClick={() => setExtendDays(item.days)}
+              className={
+                "py-2 text-xs font-medium rounded-lg border transition-all " +
+                (extendDays === item.days
+                  ? "bg-sky-600 border-sky-500 text-white shadow-sm"
+                  : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700")
+              }
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-slate-300 font-medium block mb-1.5">Hoặc nhập số ngày tùy chỉnh</label>
+        <Input
+          type="number"
+          min={1}
+          value={extendDays}
+          onChange={(e) => setExtendDays(Math.max(1, parseInt(e.target.value) || 1))}
+          placeholder="Nhập số ngày cần gia hạn..."
+        />
+      </div>
+
+      <div className="p-3 bg-sky-950/40 border border-sky-800/60 rounded-lg text-xs text-sky-200 flex items-center justify-between">
+        <span>Hạn dùng mới dự kiến:</span>
+        <span className="font-semibold text-white font-mono">
+          {getProjectedExpiry(extendLicenseItem.valid_until, extendDays)}
+        </span>
+      </div>
+    </div>
+  )}
+</Modal>
 
       {/* Confirm Dialog */}
       <ConfirmDialog
