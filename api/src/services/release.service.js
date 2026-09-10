@@ -351,9 +351,9 @@ class ReleaseService {
       return prisma.release.update({
         where: { id },
         data: {
-          build_status: 'building',
+          build_status: 'failed',
           build_run_id: String(run.id),
-          build_error: error.message || 'Đang chờ artifact updater từ GitHub Release'
+          build_error: error.message || 'Lỗi khi nhập artifact updater từ GitHub Release'
         }
       });
     }
@@ -365,6 +365,7 @@ class ReleaseService {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu phiên bản GitHub Release cần nhập' };
     }
 
+    const { repository } = await this.getReleaseBuildConfig();
     const headers = await this.getGitHubHeaders();
     const response = await fetch(
       `https://api.github.com/repos/${repository}/releases/tags/v${encodeURIComponent(normalizedVersion)}`,
@@ -388,33 +389,69 @@ class ReleaseService {
       };
     }
 
-    const updaterArtifact = (githubRelease.assets || []).find((asset) => /\.nsis\.zip$/i.test(asset.name));
-    const signatureAsset = updaterArtifact && (githubRelease.assets || []).find(
-      (asset) => asset.name === `${updaterArtifact.name}.sig`
-    );
-    if (!updaterArtifact || !signatureAsset) {
-      throw {
-        statusCode: 400,
-        code: 'GITHUB_UPDATER_ARTIFACT_MISSING',
-        message: 'GitHub Release phải có Windows updater .nsis.zip và file .nsis.zip.sig tương ứng'
-      };
+    let downloadUrl = null;
+    let updateSignature = null;
+    let artifactName = null;
+
+    // 1. Kiểm tra latest.json nếu có (Tauri v2 updater manifest)
+    const latestJsonAsset = (githubRelease.assets || []).find((asset) => asset.name === 'latest.json');
+    if (latestJsonAsset) {
+      try {
+        const latestResp = await fetch(latestJsonAsset.browser_download_url, { headers });
+        if (latestResp.ok) {
+          const latestData = await latestResp.json();
+          const platforms = latestData.platforms || {};
+          const target = platforms['windows-x86_64-nsis'] || platforms['windows-x86_64'] || Object.values(platforms)[0];
+          if (target && target.url && target.signature) {
+            downloadUrl = target.url;
+            updateSignature = target.signature.trim();
+            artifactName = latestJsonAsset.name;
+          }
+        }
+      } catch {
+        // Fallback sang quét từng asset
+      }
     }
 
-    const signatureResponse = await fetch(signatureAsset.browser_download_url, { headers });
-    const updateSignature = (await signatureResponse.text()).trim();
-    if (!signatureResponse.ok || !updateSignature) {
-      throw {
-        statusCode: 502,
-        code: 'GITHUB_SIGNATURE_FETCH_FAILED',
-        message: 'Không thể tải nội dung chữ ký .sig từ GitHub Release'
-      };
+    // 2. Quét assets: hỗ trợ .nsis.zip, -setup.exe, .exe, .msi
+    if (!downloadUrl || !updateSignature) {
+      const updaterArtifact = (githubRelease.assets || []).find((asset) => /\.nsis\.zip$/i.test(asset.name))
+        || (githubRelease.assets || []).find((asset) => /-setup\.exe$/i.test(asset.name))
+        || (githubRelease.assets || []).find((asset) => /\.exe$/i.test(asset.name) && !asset.name.endsWith('.sig'))
+        || (githubRelease.assets || []).find((asset) => /\.msi$/i.test(asset.name) && !asset.name.endsWith('.sig'));
+
+      const signatureAsset = updaterArtifact && (githubRelease.assets || []).find(
+        (asset) => asset.name === `${updaterArtifact.name}.sig`
+      );
+
+      if (!updaterArtifact || !signatureAsset) {
+        throw {
+          statusCode: 400,
+          code: 'GITHUB_UPDATER_ARTIFACT_MISSING',
+          message: 'GitHub Release phải có Windows updater (exe/msi/nsis.zip) và file chữ ký .sig tương ứng'
+        };
+      }
+
+      const signatureResponse = await fetch(signatureAsset.browser_download_url, { headers });
+      const sigText = (await signatureResponse.text()).trim();
+      if (!signatureResponse.ok || !sigText) {
+        throw {
+          statusCode: 502,
+          code: 'GITHUB_SIGNATURE_FETCH_FAILED',
+          message: 'Không thể tải nội dung chữ ký .sig từ GitHub Release'
+        };
+      }
+
+      downloadUrl = updaterArtifact.browser_download_url;
+      updateSignature = sigText;
+      artifactName = updaterArtifact.name;
     }
 
     const data = {
       version: normalizedVersion,
       channel,
       changelog: changelog.trim() || githubRelease.body || `Phiên bản Clogin Studio v${normalizedVersion}`,
-      download_url: updaterArtifact.browser_download_url,
+      download_url: downloadUrl,
       update_signature: updateSignature,
       min_version: min_version.trim() || null
     };
@@ -427,7 +464,7 @@ class ReleaseService {
 
     return {
       release,
-      artifact_name: updaterArtifact.name,
+      artifact_name: artifactName,
       github_release_url: githubRelease.html_url
     };
   }
