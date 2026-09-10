@@ -15,7 +15,8 @@ import {
   Clock,
   Layers,
   Loader2,
-  XCircle
+  XCircle,
+  Check
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { UpstreamStatus, UpstreamConfig, UpstreamCommit } from '@/lib/types';
@@ -31,6 +32,7 @@ export default function UpstreamSyncPage() {
   const toast = useToast();
   const [status, setStatus] = useState<UpstreamStatus | null>(null);
   const [commits, setCommits] = useState<UpstreamCommit[]>([]);
+  const [commitTab, setCommitTab] = useState<'pending' | 'all'>('pending');
   const [config, setConfig] = useState<UpstreamConfig>({
     github_token: '',
     upstream_repo: 'ProxyShard/ShardBrowser',
@@ -74,7 +76,10 @@ export default function UpstreamSyncPage() {
           pollTimerRef.current = null;
         }
       }
-      if (commitsRes?.data) setCommits(commitsRes.data);
+      const commitList = commitsRes?.data || [];
+      if (Array.isArray(commitList)) {
+        setCommits(commitList);
+      }
       if (configRes?.data) setConfig(configRes.data);
     } catch (err: any) {
       if (!isPolling) {
@@ -110,6 +115,11 @@ export default function UpstreamSyncPage() {
   };
 
   const handleCreateSyncPR = async () => {
+    if (status?.status === 'UP_TO_DATE' && status?.behind_by === 0 && !status?.active_pr) {
+      toast.info('Mã nguồn CloginStudio đã đồng bộ hoàn toàn với Upstream, không có commit mới nào cần tạo Pull Request!');
+      return;
+    }
+
     setActionLoading(true);
     try {
       const res = await api.post<{
@@ -118,9 +128,12 @@ export default function UpstreamSyncPage() {
         message?: string;
         action_url?: string;
         via_workflow?: boolean;
+        already_up_to_date?: boolean;
       }>('/v1/admin/upstream/create-pr');
 
-      if (res.pr_number && res.pr_url) {
+      if (res.already_up_to_date) {
+        toast.info(res.message || 'Mã nguồn đã đồng bộ hoàn toàn với Upstream!');
+      } else if (res.pr_number && res.pr_url) {
         toast.success(`Đã tạo Sync Pull Request #${res.pr_number} thành công!`);
         window.open(res.pr_url, '_blank');
       } else if (res.via_workflow) {
@@ -153,6 +166,13 @@ export default function UpstreamSyncPage() {
     status?.latest_workflow_run?.status === 'in_progress' ||
     status?.latest_workflow_run?.status === 'queued';
 
+  const isUpToDate =
+    status?.status === 'UP_TO_DATE' ||
+    (status?.behind_by === 0 && !status?.active_pr && !isWorkflowRunning);
+
+  const pendingCommits = commits.filter((c) => c.is_merged === false);
+  const displayedCommits = commitTab === 'pending' ? pendingCommits : commits;
+
   const getStatusBadge = () => {
     if (!status) return <Badge variant="default">Unknown</Badge>;
     if (isWorkflowRunning) {
@@ -165,7 +185,7 @@ export default function UpstreamSyncPage() {
     switch (status.status) {
       case 'UP_TO_DATE':
         return (
-          <Badge variant="success" className="gap-1">
+          <Badge variant="success" className="gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <CheckCircle2 className="w-3.5 h-3.5" /> Đã đồng bộ (Up-to-date)
           </Badge>
         );
@@ -221,13 +241,13 @@ export default function UpstreamSyncPage() {
           </Button>
 
           <Button
-            variant="outline"
+            variant={isUpToDate ? "outline" : "primary"}
             size="sm"
             onClick={handleCreateSyncPR}
             isLoading={actionLoading || isWorkflowRunning}
             icon={<GitPullRequest className="w-4 h-4" />}
           >
-            {isWorkflowRunning ? 'Đang chạy Sync...' : 'Tạo Sync PR'}
+            {isWorkflowRunning ? 'Đang chạy Sync...' : isUpToDate ? 'Tạo Sync PR' : 'Tạo Sync PR'}
           </Button>
 
           <Button
@@ -241,6 +261,21 @@ export default function UpstreamSyncPage() {
           </Button>
         </div>
       </div>
+
+      {/* Up-to-date Confirmation Banner */}
+      {isUpToDate && !isWorkflowRunning && (
+        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-emerald-300">
+              Mã nguồn CloginStudio đã đồng bộ trọn vẹn với Upstream
+            </h4>
+            <p className="text-xs text-emerald-200/80 mt-1">
+              Nhánh <code className="text-emerald-300 font-mono font-semibold">{config.target_branch}</code> hiện tại đã tích hợp đầy đủ mọi commit từ kho nguồn gốc <code className="text-emerald-300 font-mono">{config.upstream_repo}</code> (bao gồm Chrome 152 runtime, shardhelper, human type/mouse spoofing và các bản sửa lỗi). Không còn bản vá nào tồn đọng.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Active Pull Request Alert Card */}
       {status?.active_pr && (
@@ -356,11 +391,24 @@ export default function UpstreamSyncPage() {
         <Card className="p-4 border border-slate-800 bg-slate-900/60">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">Độ lệch Commit</span>
-            <GitCommit className="w-4 h-4 text-amber-400" />
+            {isUpToDate ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            ) : (
+              <GitCommit className="w-4 h-4 text-amber-400" />
+            )}
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-xl font-bold text-amber-400">{status?.behind_by ?? 0}</span>
-            <span className="text-xs text-slate-400">commits phía sau</span>
+            {isUpToDate ? (
+              <>
+                <span className="text-xl font-bold text-emerald-400">0</span>
+                <span className="text-xs text-emerald-400/90 font-medium">commits (Đã đồng bộ)</span>
+              </>
+            ) : (
+              <>
+                <span className="text-xl font-bold text-amber-400">{status?.behind_by ?? 0}</span>
+                <span className="text-xs text-slate-400">commits phía sau</span>
+              </>
+            )}
           </div>
         </Card>
 
@@ -381,13 +429,13 @@ export default function UpstreamSyncPage() {
       </div>
 
       {/* Warning Alert if Behind */}
-      {status?.behind_by ? status.behind_by > 0 && !status.active_pr && (
+      {!isUpToDate && status?.behind_by ? status.behind_by > 0 && !status.active_pr && (
         <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <h4 className="text-sm font-semibold text-amber-300">Kho nguồn Upstream có bản cập nhật mới</h4>
             <p className="text-xs text-amber-200/80 mt-1">
-              Đang có <strong>{status.behind_by}</strong> commit mới trên repo gốc <code className="text-amber-300">{config.upstream_repo}</code> (bao gồm Chrome 152 runtime, shardhelper, human type/mouse, spoofing và sửa lỗi). Bấm nút <strong>&quot;Tạo Sync PR&quot;</strong> để tạo nhánh và mở Pull Request đồng bộ.
+              Đang có <strong>{status.behind_by}</strong> commit mới trên repo gốc <code className="text-amber-300">{config.upstream_repo}</code>. Bấm nút <strong>&quot;Tạo Sync PR&quot;</strong> để tạo nhánh và mở Pull Request đồng bộ.
             </p>
           </div>
         </div>
@@ -395,29 +443,83 @@ export default function UpstreamSyncPage() {
 
       {/* Commit History List */}
       <Card className="p-5 border border-slate-800">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-base font-semibold text-slate-200">Lịch Sử Commits Từ Upstream</h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {status?.behind_by && status.behind_by > 0
-                ? `Hiển thị ${status.behind_by} commit mới nhất từ ${config.upstream_repo} chưa có trong nhánh ${config.target_branch}`
-                : `Danh sách các bản commit gần nhất từ repository gốc ${config.upstream_repo}`}
+              Lịch sử 30 commit gần nhất từ repo gốc <code className="text-slate-300">{config.upstream_repo}</code>. Nhãn &quot;Đã gộp&quot; xác nhận commit đã có trong nhánh <code className="text-slate-300">{config.target_branch}</code>.
             </p>
           </div>
           <a
             href={`https://github.com/${config.upstream_repo}/commits/main`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium"
+            className="text-xs text-sky-400 hover:text-sky-300 flex items-center gap-1 font-medium shrink-0"
           >
             Xem trên GitHub <ExternalLink className="w-3.5 h-3.5" />
           </a>
+        </div>
+
+        {/* Tab Filter */}
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3 mb-4">
+          <button
+            type="button"
+            onClick={() => setCommitTab('pending')}
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              commitTab === 'pending'
+                ? 'bg-slate-800 text-slate-100 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <span>Cần gộp (Chưa có trong {config.target_branch})</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                pendingCommits.length > 0
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'bg-emerald-500/20 text-emerald-300'
+              }`}
+            >
+              {pendingCommits.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCommitTab('all')}
+            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              commitTab === 'all'
+                ? 'bg-slate-800 text-slate-100 border border-slate-700'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <span>Tất cả commit Upstream</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-300">
+              {commits.length}
+            </span>
+          </button>
         </div>
 
         {loading ? (
           <div className="py-12 text-center text-slate-500 text-sm">Đang tải lịch sử commit...</div>
         ) : commits.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-sm">Chưa có lịch sử commit hoặc chưa cấu hình Token</div>
+        ) : commitTab === 'pending' && pendingCommits.length === 0 ? (
+          <div className="py-12 px-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-200">Không có commit nào cần gộp</h4>
+            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+              Mọi commit mới nhất từ kho nguồn gốc <span className="font-mono text-slate-300">{config.upstream_repo}</span> đã được hợp nhất thành công vào nhánh <span className="font-mono text-emerald-400">{config.target_branch}</span> của CloginStudio.
+            </p>
+            <button
+              type="button"
+              onClick={() => setCommitTab('all')}
+              className="mt-4 inline-flex items-center gap-1.5 text-xs text-sky-400 hover:text-sky-300 font-medium"
+            >
+              Xem toàn bộ 30 commit từ Upstream &rarr;
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -425,13 +527,14 @@ export default function UpstreamSyncPage() {
                 <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase text-[10px]">
                   <th className="py-2.5 px-3">SHA</th>
                   <th className="py-2.5 px-3">Nội dung Commit (Message)</th>
+                  <th className="py-2.5 px-3">Trạng thái gộp</th>
                   <th className="py-2.5 px-3">Tác giả</th>
                   <th className="py-2.5 px-3">Thời gian</th>
                   <th className="py-2.5 px-3 text-right">Chi tiết</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {commits.map((c) => (
+                {displayedCommits.map((c) => (
                   <tr key={c.sha} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-3">
                       <span className="font-mono text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded text-[11px]">
@@ -440,6 +543,17 @@ export default function UpstreamSyncPage() {
                     </td>
                     <td className="py-3 px-3 max-w-md">
                       <p className="text-slate-200 font-medium truncate">{c.message}</p>
+                    </td>
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      {c.is_merged ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <Check className="w-3 h-3" /> Đã gộp (Merged)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <AlertTriangle className="w-3 h-3" /> Chưa gộp (Pending)
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-3 text-slate-300">
                       <div className="flex items-center gap-2">

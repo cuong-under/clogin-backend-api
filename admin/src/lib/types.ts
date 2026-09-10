@@ -282,6 +282,7 @@ export interface UpstreamStatus {
 }
 
 export interface UpstreamCommit {
+  is_merged?: boolean;
   sha: string;
   full_sha?: string;
   message: string;

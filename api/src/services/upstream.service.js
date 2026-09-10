@@ -168,17 +168,29 @@ class UpstreamService {
           status,
           behind_by: behindBy,
           ahead_by: 0,
+          target_branch: config.target_branch,
           last_checked: new Date().toISOString(),
           total_commits: upstreamCommits.length,
-          commits: upstreamCommits.slice(0, behindBy > 0 ? behindBy : 10).map(c => ({
-            sha: c.sha.substring(0, 7),
-            full_sha: c.sha,
-            message: c.commit.message,
-            author: c.commit.author?.name || c.author?.login || 'Unknown',
-            avatar_url: c.author?.avatar_url || '',
-            date: c.commit.author?.date,
-            html_url: c.html_url
-          })),
+          commits: upstreamCommits.slice(0, behindBy > 0 ? behindBy : 10).map(c => {
+            const uSha = c.sha;
+            const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
+            const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
+            const uDate = c.commit?.author?.date || '';
+            const uMsg = (c.commit?.message || '').trim().toLowerCase();
+            const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
+            const isMerged = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+
+            return {
+              sha: uShortSha,
+              full_sha: c.sha,
+              message: c.commit.message,
+              author: c.commit.author?.name || c.author?.login || 'Unknown',
+              avatar_url: c.author?.avatar_url || '',
+              date: c.commit.author?.date,
+              html_url: c.html_url,
+              is_merged: Boolean(isMerged)
+            };
+          }),
           latest_workflow_run: latestWorkflowRun,
           active_pr: activePr
         };
@@ -208,26 +220,77 @@ class UpstreamService {
     const config = await this.getConfig();
     const headers = await this.getHeaders(config);
 
-    const commitsUrl = `https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`;
-    const res = await fetch(commitsUrl, { headers });
+    const [upstreamRes, originRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${config.upstream_repo}/commits?per_page=30`, { headers }).catch(() => null),
+      fetch(`https://api.github.com/repos/${config.origin_repo}/commits?sha=${config.target_branch}&per_page=100`, { headers }).catch(() => null)
+    ]);
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw { statusCode: res.status, code: 'GITHUB_API_ERROR', message: err.message || 'Lỗi lấy danh sách commit từ Upstream' };
+    if (!upstreamRes || !upstreamRes.ok) {
+      const err = upstreamRes ? await upstreamRes.json().catch(() => ({})) : {};
+      throw { statusCode: upstreamRes ? upstreamRes.status : 500, code: 'GITHUB_API_ERROR', message: err.message || 'Lỗi lấy danh sách commit từ Upstream' };
     }
 
-    const commits = await res.json();
-    const formatted = commits.map(c => ({
-      sha: c.sha.substring(0, 7),
-      full_sha: c.sha,
-      message: c.commit.message,
-      author: c.commit.author?.name || c.author?.login || 'Unknown',
-      avatar_url: c.author?.avatar_url || '',
-      date: c.commit.author?.date,
-      html_url: c.html_url
-    }));
+    const upstreamCommits = await upstreamRes.json();
+    let originCommits = [];
+    if (originRes && originRes.ok) {
+      originCommits = await originRes.json().catch(() => []);
+    }
 
-    return { data: formatted, commits: formatted };
+    const originShas = new Set();
+    const originSignatures = new Set();
+
+    if (Array.isArray(originCommits)) {
+      originCommits.forEach(c => {
+        if (c.sha) {
+          originShas.add(c.sha);
+          originShas.add(c.sha.substring(0, 7));
+        }
+        const authorName = (c.commit?.author?.name || '').trim().toLowerCase();
+        const date = c.commit?.author?.date || '';
+        const msg = (c.commit?.message || '').trim().toLowerCase();
+        if (date) {
+          originSignatures.add(`${authorName}||${date}||${msg}`);
+        }
+      });
+    }
+
+    let mergedCount = 0;
+    let pendingCount = 0;
+
+    const formatted = upstreamCommits.map(c => {
+      const uSha = c.sha;
+      const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
+      const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
+      const uDate = c.commit?.author?.date || '';
+      const uMsg = (c.commit?.message || '').trim().toLowerCase();
+      const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
+
+      const isMerged = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+      if (isMerged) {
+        mergedCount++;
+      } else {
+        pendingCount++;
+      }
+
+      return {
+        sha: uShortSha,
+        full_sha: c.sha,
+        message: c.commit?.message || '',
+        author: c.commit?.author?.name || c.author?.login || 'Unknown',
+        avatar_url: c.author?.avatar_url || '',
+        date: c.commit?.author?.date,
+        html_url: c.html_url,
+        is_merged: Boolean(isMerged)
+      };
+    });
+
+    return {
+      target_branch: config.target_branch,
+      merged_count: mergedCount,
+      pending_count: pendingCount,
+      data: formatted,
+      commits: formatted
+    };
   }
 
   async createSyncPullRequest() {
