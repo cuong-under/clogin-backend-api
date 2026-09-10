@@ -31,6 +31,20 @@ router.get('/update/manifest', async (req, res, next) => {
   }
 });
 
+// Secure redirect/proxy download artifact từ GitHub Private Release sang CDN.
+router.get('/update/download', async (req, res, next) => {
+  try {
+    const downloadUrl = await releaseService.getDownloadUrl(req.query.v || req.query.version);
+    if (!downloadUrl) return res.status(404).json({ error: 'Release artifact not found' });
+    return res.redirect(302, downloadUrl);
+  } catch (err) {
+    if (err.statusCode) {
+      return sendError(res, err.statusCode, err.code, err.message);
+    }
+    next(err);
+  }
+});
+
 router.get('/announcements', async (req, res, next) => {
   try {
     const announcements = await systemService.getActiveAnnouncements();

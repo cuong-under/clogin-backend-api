@@ -469,6 +469,51 @@ class ReleaseService {
     };
   }
 
+  async getDownloadUrl(targetVersion) {
+    const release = targetVersion
+      ? await prisma.release.findFirst({ where: { version: targetVersion.trim().replace(/^v/i, '') } })
+      : await prisma.release.findFirst({ where: { is_current: true }, orderBy: { published_at: 'desc' } });
+
+    if (!release) return null;
+
+    if (release.download_url && !release.download_url.includes('github.com')) {
+      return release.download_url;
+    }
+
+    try {
+      const { repository } = await this.getReleaseBuildConfig();
+      const headers = await this.getGitHubHeaders();
+      const tag = `v${release.version}`;
+
+      const relRes = await fetch(
+        `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`,
+        { headers }
+      );
+      if (!relRes.ok) return release.download_url;
+
+      const githubRelease = await relRes.json();
+      const updaterArtifact = (githubRelease.assets || []).find((asset) => /-setup\.exe$/i.test(asset.name))
+        || (githubRelease.assets || []).find((asset) => /\.exe$/i.test(asset.name) && !asset.name.endsWith('.sig'))
+        || (githubRelease.assets || []).find((asset) => /\.msi$/i.test(asset.name) && !asset.name.endsWith('.sig'))
+        || (githubRelease.assets || []).find((asset) => /\.nsis\.zip$/i.test(asset.name));
+
+      if (!updaterArtifact) return release.download_url;
+
+      const assetRes = await fetch(updaterArtifact.url, {
+        headers: {
+          ...headers,
+          Accept: 'application/octet-stream'
+        },
+        redirect: 'manual'
+      });
+
+      const location = assetRes.headers.get('location');
+      return location || updaterArtifact.browser_download_url;
+    } catch {
+      return release.download_url;
+    }
+  }
+
   async getLatestRelease() {
     const release = await prisma.release.findFirst({
       where: { is_current: true },
@@ -477,9 +522,13 @@ class ReleaseService {
 
     if (!isUpdateReady(release)) return null;
 
+    const downloadUrl = (release.download_url && release.download_url.includes('github.com'))
+      ? `https://api-clogin.nghemmo.com/v1/app/update/download?v=${encodeURIComponent(release.version)}`
+      : release.download_url;
+
     return {
       latest: release.version,
-      url: release.download_url,
+      url: downloadUrl,
       changelog: release.changelog || `Phiên bản phát hành Clogin Studio v${release.version}`
     };
   }
@@ -504,11 +553,15 @@ class ReleaseService {
     });
     if (!isUpdateReady(release)) return null;
 
+    const downloadUrl = (release.download_url && release.download_url.includes('github.com'))
+      ? `https://api-clogin.nghemmo.com/v1/app/update/download?v=${encodeURIComponent(release.version)}`
+      : release.download_url;
+
     return {
       version: release.version,
       notes: release.changelog || `Phiên bản Clogin Studio v${release.version}`,
       pub_date: release.published_at.toISOString(),
-      url: release.download_url,
+      url: downloadUrl,
       signature: release.update_signature.trim()
     };
   }
