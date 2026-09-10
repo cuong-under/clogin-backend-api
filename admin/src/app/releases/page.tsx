@@ -77,6 +77,7 @@ export default function ReleasesPage() {
 
   useEffect(() => {
     fetchReleases();
+    fetchSigningStatus();
   }, []);
 
   const fetchSigningStatus = async () => {

@@ -302,14 +302,15 @@ class ReleaseService {
   async getBuildStatus(id) {
     const release = await prisma.release.findUnique({ where: { id } });
     if (!release) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Release không tồn tại' };
-    if (!release.build_commit_sha || !['queued', 'building'].includes(release.build_status)) return release;
+    if (!['queued', 'building', 'failed'].includes(release.build_status)) return release;
 
     const { repository } = await this.getReleaseBuildConfig();
     const runsResponse = await this.githubRequest(
-      `/repos/${repository}/actions/runs?event=push&head_sha=${release.build_commit_sha}&per_page=20`
+      `/repos/${repository}/actions/runs?per_page=20`
     );
     const data = await runsResponse.json();
-    const run = (data.workflow_runs || []).find((item) => item.name === 'Release' || item.name?.includes('release.yml') || item.path?.endsWith('release.yml'));
+    const tag = `v${release.version}`;
+    const run = (data.workflow_runs || []).find((item) => (item.name === 'Release' || item.name?.includes('release.yml') || item.path?.endsWith('release.yml')) && (item.head_branch === tag || (release.build_commit_sha && item.head_sha === release.build_commit_sha)));
     if (!run) return release;
 
     if (run.status !== 'completed') {
