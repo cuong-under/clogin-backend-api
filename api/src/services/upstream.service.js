@@ -14,7 +14,7 @@ class UpstreamService {
       upstream_repo: val.upstream_repo || DEFAULT_UPSTREAM,
       origin_repo: val.origin_repo || DEFAULT_ORIGIN,
       target_branch: val.target_branch || 'main',
-      release_branch: val.release_branch || 'refactor/code-organization'
+      release_branch: val.release_branch || 'main'
     };
   }
 
@@ -393,30 +393,66 @@ class UpstreamService {
     }
   }
 
-  async triggerReleaseWorkflow() {
+  async triggerReleaseWorkflow(data = {}) {
     const config = await this.getConfig();
-    const headers = await this.getHeaders(config);
+    const releaseService = require('./release.service');
 
-    const url = `https://api.github.com/repos/${config.origin_repo}/actions/workflows/release.yml/dispatches`;
-    const body = {
-      ref: config.target_branch
-    };
+    let version = data.version ? data.version.trim().replace(/^v/i, '') : '';
+    const changelog = data.changelog || 'Cập nhật từ Upstream: Chromium 152 runtime, ShardHelper, Human Mouse & Type spoofing, bug fixes.';
+    const branch = data.branch || config.release_branch || config.target_branch || 'main';
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body)
-    });
-
-    if (res.status === 204) {
-      return {
-        success: true,
-        message: 'Đã kích hoạt GitHub Actions build release mới thành công!'
-      };
+    // Nếu không truyền version, tự động tính toán patch version tiếp theo
+    if (!version) {
+      try {
+        const headers = await this.getHeaders(config);
+        const pkgRes = await fetch(`https://api.github.com/repos/${config.origin_repo}/contents/package.json?ref=${branch}`, { headers });
+        if (pkgRes.ok) {
+          const pkgData = await pkgRes.json();
+          const pkgContent = JSON.parse(Buffer.from(pkgData.content, 'base64').toString('utf8'));
+          const currentVer = pkgContent.version || '0.1.10';
+          const parts = currentVer.split('.').map(Number);
+          if (parts.length === 3 && !isNaN(parts[2])) {
+            parts[2] += 1;
+            version = parts.join('.');
+          } else {
+            version = `${currentVer}.1`;
+          }
+        }
+      } catch (e) {
+        version = '0.1.11';
+      }
     }
 
-    const data = await res.json().catch(() => ({}));
-    throw { statusCode: res.status, code: 'GITHUB_API_ERROR', message: data.message || 'Không thể kích hoạt GitHub Actions workflow' };
+    if (!version) version = '0.1.11';
+
+    // Tạo release draft và kích hoạt build thông qua releaseService
+    try {
+      const release = await releaseService.createRelease({
+        version,
+        channel: data.channel || 'stable',
+        changelog,
+        is_current: false
+      });
+
+      const buildResult = await releaseService.startBuild(release.id);
+      return {
+        success: true,
+        release_id: release.id,
+        tag: buildResult.tag,
+        commit_sha: buildResult.commit_sha,
+        source_branch: buildResult.source_branch,
+        message: `Đã tạo phiên bản v${version} trên nhánh ${buildResult.source_branch} và kích hoạt GitHub Actions build release thành công!`
+      };
+    } catch (err) {
+      if (err.code === 'TAG_EXISTS' || err.statusCode === 409) {
+        throw {
+          statusCode: 400,
+          code: 'RELEASE_ALREADY_EXISTS',
+          message: `Phiên bản v${version} hoặc tag đã tồn tại trên GitHub. Vui lòng nhập phiên bản cao hơn (ví dụ: 0.1.12).`
+        };
+      }
+      throw err;
+    }
   }
 }
 

@@ -953,7 +953,7 @@ router.post('/upstream/create-pr', requireRole(['super_admin']), async (req, res
 
 router.post('/upstream/trigger-release', requireRole(['super_admin']), async (req, res, next) => {
   try {
-    const result = await upstreamService.triggerReleaseWorkflow();
+    const result = await upstreamService.triggerReleaseWorkflow(req.body);
     return res.status(200).json(result);
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
 });

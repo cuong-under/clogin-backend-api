@@ -45,6 +45,11 @@ export default function UpstreamSyncPage() {
   const [configLoading, setConfigLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [releaseForm, setReleaseForm] = useState({
+    version: '0.1.11',
+    changelog: 'Cập nhật từ Upstream: Chromium 152 runtime, ShardHelper, Human Mouse & Type spoofing, bookmarks và các bản vá lỗi.'
+  });
 
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -149,12 +154,22 @@ export default function UpstreamSyncPage() {
     }
   };
 
-  const handleTriggerRelease = async () => {
-    if (!confirm('Bạn có chắc chắn muốn kích hoạt GitHub Actions build bản release mới không?')) return;
+  const handleTriggerRelease = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setActionLoading(true);
     try {
-      const res = await api.post<{ message: string }>('/v1/admin/upstream/trigger-release');
-      toast.success(res.message || 'Đã gửi tín hiệu build release đến GitHub Actions!');
+      const res = await api.post<{
+        message?: string;
+        tag?: string;
+        source_branch?: string;
+      }>('/v1/admin/upstream/trigger-release', {
+        version: releaseForm.version,
+        changelog: releaseForm.changelog,
+        branch: config.target_branch || 'main'
+      });
+      toast.success(res.message || 'Đã khởi tạo bản build release thành công!');
+      setShowReleaseModal(false);
+      fetchStatusAndCommits();
     } catch (err: any) {
       toast.error(err.message || 'Lỗi kích hoạt release build');
     } finally {
@@ -253,7 +268,7 @@ export default function UpstreamSyncPage() {
           <Button
             variant="primary"
             size="sm"
-            onClick={handleTriggerRelease}
+            onClick={() => setShowReleaseModal(true)}
             isLoading={actionLoading}
             icon={<Play className="w-4 h-4" />}
           >
@@ -583,6 +598,55 @@ export default function UpstreamSyncPage() {
           </div>
         )}
       </Card>
+
+            {/* Modal Build Release Mới */}
+      <Modal
+        isOpen={showReleaseModal}
+        onClose={() => setShowReleaseModal(false)}
+        title="Tạo & Build Phiên Bản Release Mới"
+      >
+        <form onSubmit={handleTriggerRelease} className="space-y-4">
+          <div className="space-y-1">
+            <Input
+              label="Phiên bản phát hành mới (Version SemVer)"
+              placeholder="0.1.11"
+              value={releaseForm.version}
+              onChange={(e) => setReleaseForm({ ...releaseForm, version: e.target.value })}
+              required
+            />
+            <p className="text-[11px] text-slate-400">
+              Hệ thống sẽ tự động cập nhật số phiên bản này vào package.json, Cargo.toml, tauri.conf.json trên nhánh <strong>{config.target_branch || 'main'}</strong> và tạo git tag tương ứng.
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-slate-300">Ghi chú phát hành (Changelog)</label>
+            <textarea
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs text-slate-200 focus:outline-none focus:border-sky-500 min-h-[90px]"
+              placeholder="Nhập nội dung các tính năng mới..."
+              value={releaseForm.changelog}
+              onChange={(e) => setReleaseForm({ ...releaseForm, changelog: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="p-3 rounded bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 space-y-1">
+            <p><strong>Quy trình tự động:</strong></p>
+            <p>&bull; 1. Tự tạo commit <code>chore(release): v{releaseForm.version}</code>.</p>
+            <p>&bull; 2. Tạo git tag <code>v{releaseForm.version}</code> đẩy lên GitHub.</p>
+            <p>&bull; 3. GitHub Actions biên dịch bộ cài Windows, ký minisign và đính kèm vào GitHub Release.</p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" type="button" onClick={() => setShowReleaseModal(false)}>
+              Hủy
+            </Button>
+            <Button variant="primary" type="submit" isLoading={actionLoading} icon={<Play className="w-3.5 h-3.5" />}>
+              Bắt Đầu Build Release
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal Configuration */}
       <Modal

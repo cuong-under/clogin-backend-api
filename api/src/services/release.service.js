@@ -47,7 +47,7 @@ class ReleaseService {
     return {
       token: value.github_token || process.env.GITHUB_TOKEN || '',
       repository: value.origin_repo || 'cuong-under/CloginStudio',
-      branch: value.release_branch || 'refactor/code-organization'
+      branch: value.release_branch || 'main'
     };
   }
 
