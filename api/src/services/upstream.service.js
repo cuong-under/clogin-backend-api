@@ -171,14 +171,15 @@ class UpstreamService {
           target_branch: config.target_branch,
           last_checked: new Date().toISOString(),
           total_commits: upstreamCommits.length,
-          commits: upstreamCommits.slice(0, behindBy > 0 ? behindBy : 10).map(c => {
+          commits: upstreamCommits.slice(0, behindBy > 0 ? behindBy : 10).map((c, index) => {
             const uSha = c.sha;
-            const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
-            const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
-            const uDate = c.commit?.author?.date || '';
-            const uMsg = (c.commit?.message || '').trim().toLowerCase();
+            const uShortSha = c.sha ? c.sha.substring(0, 7) : "";
+            const uAuthorName = (c.commit?.author?.name || "").trim().toLowerCase();
+            const uDate = c.commit?.author?.date || "";
+            const uMsg = (c.commit?.message || "").trim().toLowerCase();
             const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
-            const isMerged = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+            const directMatch = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+            const isMerged = directMatch || (matchIndex !== -1 && index >= matchIndex);
 
             return {
               sha: uShortSha,
@@ -257,15 +258,15 @@ class UpstreamService {
     let mergedCount = 0;
     let pendingCount = 0;
 
-    const formatted = upstreamCommits.map(c => {
+    const formatted = upstreamCommits.map((c, index) => {
       const uSha = c.sha;
-      const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
-      const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
-      const uDate = c.commit?.author?.date || '';
-      const uMsg = (c.commit?.message || '').trim().toLowerCase();
+      const uShortSha = c.sha ? c.sha.substring(0, 7) : "";
+      const uAuthorName = (c.commit?.author?.name || "").trim().toLowerCase();
+      const uDate = c.commit?.author?.date || "";
+      const uMsg = (c.commit?.message || "").trim().toLowerCase();
       const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
-
-      const isMerged = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+      const directMatch = originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+      const isMerged = directMatch || (matchIndex !== -1 && index >= matchIndex);
       if (isMerged) {
         mergedCount++;
       } else {
