@@ -47,7 +47,7 @@ class ReleaseService {
     return {
       token: value.github_token || process.env.GITHUB_TOKEN || '',
       repository: value.origin_repo || 'cuong-under/CloginStudio',
-      branch: value.release_branch || 'main'
+      branch: (value.release_branch === 'refactor/code-organization' ? 'main' : (value.release_branch || 'main'))
     };
   }
 
@@ -63,6 +63,7 @@ class ReleaseService {
   }
 
   async githubRequest(path, options = {}) {
+    const { repository } = await this.getReleaseBuildConfig();
     const headers = await this.getGitHubHeaders();
     const response = await fetch(`https://api.github.com${path}`, {
       ...options,
@@ -308,7 +309,7 @@ class ReleaseService {
       `/repos/${repository}/actions/runs?event=push&head_sha=${release.build_commit_sha}&per_page=20`
     );
     const data = await runsResponse.json();
-    const run = (data.workflow_runs || []).find((item) => item.name === 'Release');
+    const run = (data.workflow_runs || []).find((item) => item.name === 'Release' || item.name?.includes('release.yml') || item.path?.endsWith('release.yml'));
     if (!run) return release;
 
     if (run.status !== 'completed') {
@@ -365,7 +366,7 @@ class ReleaseService {
 
     const headers = await this.getGitHubHeaders();
     const response = await fetch(
-      `https://api.github.com/repos/cuong-under/CloginStudio/releases/tags/v${encodeURIComponent(normalizedVersion)}`,
+      `https://api.github.com/repos/${repository}/releases/tags/v${encodeURIComponent(normalizedVersion)}`,
       { headers }
     );
     if (!response.ok) {

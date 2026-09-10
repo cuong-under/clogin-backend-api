@@ -360,7 +360,7 @@ export default function ReleasesPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!editingRelease && (
             <p className="rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2 text-xs leading-relaxed text-sky-100">
-              Tạo bản nháp trước, sau đó bấm <strong>Build</strong> ở danh sách. Trước lần đầu, vào <strong>Releases &gt; Đồng bộ Upstream</strong> để lưu GitHub Token và đặt Release Branch là <code>refactor/code-organization</code>.
+              Tạo bản nháp trước, sau đó bấm <strong>Build</strong> ở danh sách. Trước lần đầu, vào <strong>Releases &gt; Đồng bộ Upstream</strong> để lưu GitHub Token và đặt Release Branch là <code>main</code>.
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

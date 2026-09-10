@@ -38,7 +38,7 @@ export default function UpstreamSyncPage() {
     upstream_repo: 'ProxyShard/ShardBrowser',
     origin_repo: 'cuong-under/CloginStudio',
     target_branch: 'main',
-    release_branch: 'refactor/code-organization'
+    release_branch: 'main'
   });
 
   const [loading, setLoading] = useState(true);
@@ -165,7 +165,7 @@ export default function UpstreamSyncPage() {
       }>('/v1/admin/upstream/trigger-release', {
         version: releaseForm.version,
         changelog: releaseForm.changelog,
-        branch: config.target_branch || 'main'
+        branch: config.release_branch || config.target_branch || 'main'
       });
       toast.success(res.message || 'Đã khởi tạo bản build release thành công!');
       setShowReleaseModal(false);
@@ -689,7 +689,7 @@ export default function UpstreamSyncPage() {
 
           <Input
             label="Release Branch (Nhánh Phát Hành)"
-            placeholder="refactor/code-organization"
+            placeholder="main"
             value={config.release_branch}
             onChange={(e) => setConfig({ ...config, release_branch: e.target.value })}
           />

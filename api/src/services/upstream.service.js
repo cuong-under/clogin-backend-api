@@ -14,7 +14,7 @@ class UpstreamService {
       upstream_repo: val.upstream_repo || DEFAULT_UPSTREAM,
       origin_repo: val.origin_repo || DEFAULT_ORIGIN,
       target_branch: val.target_branch || 'main',
-      release_branch: val.release_branch || 'main'
+      release_branch: (val.release_branch === 'refactor/code-organization' ? 'main' : (val.release_branch || 'main'))
     };
   }
 
@@ -25,7 +25,7 @@ class UpstreamService {
       upstream_repo: data.upstream_repo || current.upstream_repo,
       origin_repo: data.origin_repo || current.origin_repo,
       target_branch: data.target_branch || current.target_branch,
-      release_branch: data.release_branch || current.release_branch
+      release_branch: (data.release_branch === 'refactor/code-organization' ? 'main' : (data.release_branch || current.release_branch))
     };
 
     await prisma.systemConfig.upsert({
@@ -400,7 +400,8 @@ class UpstreamService {
 
     let version = data.version ? data.version.trim().replace(/^v/i, '') : '';
     const changelog = data.changelog || 'Cập nhật từ Upstream: Chromium 152 runtime, ShardHelper, Human Mouse & Type spoofing, bug fixes.';
-    const branch = data.branch || config.release_branch || config.target_branch || 'main';
+    let branch = data.branch || config.release_branch || config.target_branch || 'main';
+    if (branch === 'refactor/code-organization') branch = 'main';
 
     // Nếu không truyền version, tự động tính toán patch version tiếp theo
     if (!version) {
