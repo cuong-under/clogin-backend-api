@@ -427,30 +427,44 @@ class UpstreamService {
 
     if (!version) version = '0.1.11';
 
-    // Tạo release draft và kích hoạt build thông qua releaseService
+    // Tạo release draft hoặc tái sử dụng bản ghi cũ đang kẹt và kích hoạt build
     try {
-      const release = await releaseService.createRelease({
-        version,
-        channel: data.channel || 'stable',
-        changelog,
-        is_current: false
-      });
+      const existingRelease = await prisma.release.findUnique({ where: { version } });
+      let releaseId;
+      if (existingRelease) {
+        if (existingRelease.is_current) {
+          throw { statusCode: 400, code: "CURRENT_RELEASE", message: "Không thể build lại Release Current" };
+        }
+        await prisma.release.update({
+          where: { id: existingRelease.id },
+          data: { build_status: "draft", build_error: null, changelog: changelog || existingRelease.changelog }
+        });
+        releaseId = existingRelease.id;
+      } else {
+        const release = await releaseService.createRelease({
+          version,
+          channel: data.channel || "stable",
+          changelog,
+          is_current: false
+        });
+        releaseId = release.id;
+      }
 
-      const buildResult = await releaseService.startBuild(release.id);
+      const buildResult = await releaseService.startBuild(releaseId);
       return {
         success: true,
-        release_id: release.id,
+        release_id: releaseId,
         tag: buildResult.tag,
         commit_sha: buildResult.commit_sha,
         source_branch: buildResult.source_branch,
-        message: `Đã tạo phiên bản v${version} trên nhánh ${buildResult.source_branch} và kích hoạt GitHub Actions build release thành công!`
+        message: "Đã tạo phiên bản v" + version + " trên nhánh " + buildResult.source_branch + " và kích hoạt GitHub Actions build release thành công!"
       };
     } catch (err) {
-      if (err.code === 'TAG_EXISTS' || err.statusCode === 409) {
+      if (err.code === "TAG_EXISTS") {
         throw {
           statusCode: 400,
-          code: 'RELEASE_ALREADY_EXISTS',
-          message: `Phiên bản v${version} hoặc tag đã tồn tại trên GitHub. Vui lòng nhập phiên bản cao hơn (ví dụ: 0.1.12).`
+          code: "RELEASE_ALREADY_EXISTS",
+          message: "Tag v" + version + " đã tồn tại trên GitHub. Vui lòng xóa tag cũ trên GitHub trước."
         };
       }
       throw err;
