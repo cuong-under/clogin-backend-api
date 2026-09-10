@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { DownloadCloud, KeyRound, Plus, CheckCircle, Edit2, Github, Play, Trash2 } from 'lucide-react';
+import { DownloadCloud, KeyRound, Plus, CheckCircle, Edit2, Github, Play, Trash2, ExternalLink } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Release, Channel } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
@@ -228,7 +228,20 @@ export default function ReleasesPage() {
   const getBuildBadge = (release: Release) => {
     if (isUpdateReady(release) || release.build_status === 'ready') return <Badge variant="success">Sẵn sàng</Badge>;
     if (release.build_status === 'queued') return <Badge variant="info">Đang xếp hàng</Badge>;
-    if (release.build_status === 'building') return <Badge variant="warning">Đang build</Badge>;
+    if (release.build_status === 'building') {
+      const runUrl = release.build_run_id ? 'https://github.com/cuong-under/CloginStudio/actions/runs/' + release.build_run_id : 'https://github.com/cuong-under/CloginStudio/actions';
+      return (
+        <a
+          href={runUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 hover:opacity-80"
+          title="GitHub Actions đang biên dịch (thường mất 15-20 phút). Bấm để xem log trực tiếp"
+        >
+          <Badge variant="warning">Đang build (~15-20p) ↗</Badge>
+        </a>
+      );
+    }
     if (release.build_status === 'failed') return <Badge variant="danger">Build lỗi</Badge>;
     return <Badge variant="default">Bản nháp</Badge>;
   };
@@ -279,17 +292,31 @@ export default function ReleasesPage() {
             Sửa
           </Button>
           {!item.is_current && !isUpdateReady(item) && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleBuild(item)}
-              isLoading={buildingReleaseId === item.id || ['queued', 'building'].includes(item.build_status || '')}
-              disabled={['queued', 'building'].includes(item.build_status || '')}
-              title={item.build_error || 'Tạo commit/tag và build updater qua GitHub Actions'}
-              icon={<Play className="w-3.5 h-3.5" />}
-            >
-              {item.build_status === 'failed' ? 'Build lại' : 'Build'}
-            </Button>
+            item.build_status === 'building' ? (
+              <a
+                href={item.build_run_id ? 'https://github.com/cuong-under/CloginStudio/actions/runs/' + item.build_run_id : 'https://github.com/cuong-under/CloginStudio/actions'}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 transition-colors"
+                title="Bấm để xem log trực tiếp trên GitHub Actions (quá trình biên dịch mất khoảng 15-20 phút)"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                Xem tiến độ build
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => handleBuild(item)}
+                isLoading={buildingReleaseId === item.id}
+                disabled={item.build_status === 'queued'}
+                title={item.build_error || 'Tạo commit/tag và build updater qua GitHub Actions'}
+                icon={<Play className="w-3.5 h-3.5" />}
+              >
+                {item.build_status === 'failed' ? 'Build lại' : item.build_status === 'queued' ? 'Đang xếp hàng' : 'Build'}
+              </Button>
+            )
           )}
           {!item.is_current && (
             <Button
