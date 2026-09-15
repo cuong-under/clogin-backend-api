@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { DownloadCloud, KeyRound, Plus, CheckCircle, Edit2, Github, Play, Trash2, ExternalLink } from 'lucide-react';
+import { DownloadCloud, KeyRound, Plus, CheckCircle, Edit2, Github, Play, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Release, Channel } from '@/lib/types';
 import { Table, Column } from '@/components/ui/Table';
@@ -44,6 +44,7 @@ export default function ReleasesPage() {
   });
   const [importingGitHub, setImportingGitHub] = useState(false);
   const [buildingReleaseId, setBuildingReleaseId] = useState<string | null>(null);
+  const [checkingReleaseId, setCheckingReleaseId] = useState<string | null>(null);
   const [isSigningOpen, setIsSigningOpen] = useState(false);
   const [signingStatus, setSigningStatus] = useState({ configured: false, has_password: false, can_manage: true });
   const [signingForm, setSigningForm] = useState({ private_key: '', password: '' });
@@ -197,6 +198,25 @@ export default function ReleasesPage() {
     }
   };
 
+  const handleCheckStatus = async (release: Release) => {
+    setCheckingReleaseId(release.id);
+    try {
+      const res = await api.get<Release>(`/v1/admin/releases/${release.id}/build-status`);
+      if (res.build_status === 'ready' || isUpdateReady(res)) {
+        toast.success(`Release v${res.version} đã sẵn sàng và tự động nạp artifact updater!`);
+      } else if (res.build_status === 'failed') {
+        toast.error(res.build_error || 'Bản build trên GitHub vẫn báo lỗi');
+      } else {
+        toast.info(`Trạng thái: ${res.build_status || 'chưa sẵn sàng'}`);
+      }
+      fetchReleases();
+    } catch (err: any) {
+      toast.error(err.message || 'Không thể kiểm tra trạng thái build');
+    } finally {
+      setCheckingReleaseId(null);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteId) return;
     setDeleting(true);
@@ -242,7 +262,20 @@ export default function ReleasesPage() {
         </a>
       );
     }
-    if (release.build_status === 'failed') return <Badge variant="danger">Build lỗi</Badge>;
+    if (release.build_status === 'failed') {
+      const runUrl = release.build_run_id ? 'https://github.com/cuong-under/CloginStudio/actions/runs/' + release.build_run_id : 'https://github.com/cuong-under/CloginStudio/actions';
+      return (
+        <a
+          href={runUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 hover:opacity-80"
+          title={release.build_error || 'GitHub Actions build thất bại. Bấm để mở log trực tiếp trên GitHub'}
+        >
+          <Badge variant="danger">Build lỗi ↗</Badge>
+        </a>
+      );
+    }
     return <Badge variant="default">Bản nháp</Badge>;
   };
 
@@ -317,6 +350,18 @@ export default function ReleasesPage() {
                 {item.build_status === 'failed' ? 'Build lại' : item.build_status === 'queued' ? 'Đang xếp hàng' : 'Build'}
               </Button>
             )
+          )}
+          {!item.is_current && !isUpdateReady(item) && item.build_status === 'failed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleCheckStatus(item)}
+              isLoading={checkingReleaseId === item.id}
+              title="Kiểm tra lại trạng thái từ GitHub Actions và tự động cào artifact updater nếu build đã có sẵn"
+              icon={<RefreshCw className="w-3.5 h-3.5 text-sky-400" />}
+            >
+              Kiểm tra
+            </Button>
           )}
           {!item.is_current && (
             <Button

@@ -221,9 +221,27 @@ class ReleaseService {
       headers: await this.getGitHubHeaders()
     });
     if (tagCheck.ok) {
-      throw { statusCode: 409, code: 'TAG_EXISTS', message: `Tag ${tag} đã tồn tại trên GitHub` };
-    }
-    if (tagCheck.status !== 404) {
+      // Nếu là build lại của release chưa phát hành (draft / failed), dọn dẹp tag/release cũ để build lại thành công
+      if (release.build_status === 'failed' || !release.is_current) {
+        try {
+          const existingReleaseRes = await fetch(
+            `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`,
+            { headers: await this.getGitHubHeaders() }
+          );
+          if (existingReleaseRes.ok) {
+            const relData = await existingReleaseRes.json();
+            if (relData?.id) {
+              await this.githubRequest(`/repos/${repository}/releases/${relData.id}`, { method: 'DELETE' }).catch(() => {});
+            }
+          }
+          await this.githubRequest(`/repos/${repository}/git/refs/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' }).catch(() => {});
+        } catch {
+          // Bỏ qua lỗi nếu release hoặc tag chưa tồn tại
+        }
+      } else {
+        throw { statusCode: 409, code: 'TAG_EXISTS', message: `Tag ${tag} đã tồn tại trên GitHub` };
+      }
+    } else if (tagCheck.status !== 404) {
       const detail = await tagCheck.json().catch(() => ({}));
       throw { statusCode: 502, code: 'GITHUB_API_ERROR', message: detail.message || 'Không thể kiểm tra tag GitHub' };
     }
@@ -280,11 +298,33 @@ class ReleaseService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sha: commit.sha, force: false })
     });
-    await this.githubRequest(`/repos/${repository}/git/refs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: commit.sha })
-    });
+
+    try {
+      await this.githubRequest(`/repos/${repository}/git/refs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: commit.sha })
+      });
+    } catch {
+      await this.githubRequest(`/repos/${repository}/git/refs/tags/${encodeURIComponent(tag)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sha: commit.sha, force: true })
+      });
+    }
+
+    try {
+      await this.githubRequest(`/repos/${repository}/actions/workflows/release.yml/dispatches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ref: branch,
+          inputs: { tag }
+        })
+      });
+    } catch {
+      // Fallback tự động chạy qua webhook push tag
+    }
 
     const updatedRelease = await prisma.release.update({
       where: { id },
@@ -306,17 +346,20 @@ class ReleaseService {
 
     const { repository } = await this.getReleaseBuildConfig();
     const runsResponse = await this.githubRequest(
-      `/repos/${repository}/actions/runs?per_page=20`
+      `/repos/${repository}/actions/runs?per_page=50`
     );
     const data = await runsResponse.json();
     const tag = `v${release.version}`;
-    const run = (data.workflow_runs || []).find((item) => (item.name === 'Release' || item.name?.includes('release.yml') || item.path?.endsWith('release.yml')) && (item.head_branch === tag || (release.build_commit_sha && item.head_sha === release.build_commit_sha)));
+    const run = (data.workflow_runs || []).find((item) => 
+      (item.name === 'Release' || item.name?.includes('release.yml') || item.path?.endsWith('release.yml'))
+      && (item.head_branch === tag || (release.build_commit_sha && item.head_sha === release.build_commit_sha) || (item.display_title && item.display_title.includes(tag)))
+    );
     if (!run) return release;
 
     if (run.status !== 'completed') {
       return prisma.release.update({
         where: { id },
-        data: { build_status: 'building', build_run_id: String(run.id) }
+        data: { build_status: 'building', build_run_id: String(run.id), build_error: null }
       });
     }
     if (run.conclusion !== 'success') {
@@ -325,7 +368,7 @@ class ReleaseService {
         data: {
           build_status: 'failed',
           build_run_id: String(run.id),
-          build_error: `GitHub Actions build thất bại: ${run.html_url}`
+          build_error: `GitHub Actions build thất bại (${run.conclusion}): ${run.html_url}`
         }
       });
     }
@@ -357,6 +400,61 @@ class ReleaseService {
         }
       });
     }
+  }
+
+  async downloadReleaseAssetText(asset) {
+    if (!asset) {
+      throw { statusCode: 400, code: 'INVALID_ASSET', message: 'Không tìm thấy asset để tải' };
+    }
+    const headers = await this.getGitHubHeaders();
+
+    // 1. Đối với Private Repositories: Dùng asset.url với header Accept: application/octet-stream
+    // GitHub API sẽ trả về 302 redirect tới signed S3 URL
+    if (asset.url) {
+      try {
+        const redirectRes = await fetch(asset.url, {
+          headers: {
+            ...headers,
+            Accept: 'application/octet-stream'
+          },
+          redirect: 'manual'
+        });
+
+        const location = redirectRes.headers.get('location');
+        if (location) {
+          // Tuyệt đối không gửi header Authorization tới signed storage URL
+          const fileRes = await fetch(location);
+          if (fileRes.ok) {
+            const text = await fileRes.text();
+            if (text && text.trim()) return text.trim();
+          }
+        } else if (redirectRes.ok) {
+          const text = await redirectRes.text();
+          if (text && text.trim()) return text.trim();
+        }
+      } catch {
+        // Fallback sang browser_download_url
+      }
+    }
+
+    // 2. Fallback: Thử tải qua browser_download_url
+    if (asset.browser_download_url) {
+      try {
+        const resp = await fetch(asset.browser_download_url, { headers });
+        if (resp.ok) {
+          const text = await resp.text();
+          if (text && text.trim()) return text.trim();
+        }
+      } catch {
+        // Bỏ qua lỗi
+      }
+    }
+
+    throw {
+      statusCode: 502,
+      code: 'GITHUB_ASSET_FETCH_FAILED',
+      message: `Không thể tải nội dung file ${asset.name || 'asset'} từ GitHub Release`
+    };
   }
 
   async importGitHubRelease({ version, channel = 'stable', changelog = '', min_version = '' }) {
@@ -397,16 +495,14 @@ class ReleaseService {
     const latestJsonAsset = (githubRelease.assets || []).find((asset) => asset.name === 'latest.json');
     if (latestJsonAsset) {
       try {
-        const latestResp = await fetch(latestJsonAsset.browser_download_url, { headers });
-        if (latestResp.ok) {
-          const latestData = await latestResp.json();
-          const platforms = latestData.platforms || {};
-          const target = platforms['windows-x86_64-nsis'] || platforms['windows-x86_64'] || Object.values(platforms)[0];
-          if (target && target.url && target.signature) {
-            downloadUrl = target.url;
-            updateSignature = target.signature.trim();
-            artifactName = latestJsonAsset.name;
-          }
+        const latestText = await this.downloadReleaseAssetText(latestJsonAsset);
+        const latestData = JSON.parse(latestText);
+        const platforms = latestData.platforms || {};
+        const target = platforms['windows-x86_64-nsis'] || platforms['windows-x86_64'] || Object.values(platforms)[0];
+        if (target && target.url && target.signature) {
+          downloadUrl = target.url;
+          updateSignature = target.signature.trim();
+          artifactName = latestJsonAsset.name;
         }
       } catch {
         // Fallback sang quét từng asset
@@ -432,18 +528,8 @@ class ReleaseService {
         };
       }
 
-      const signatureResponse = await fetch(signatureAsset.browser_download_url, { headers });
-      const sigText = (await signatureResponse.text()).trim();
-      if (!signatureResponse.ok || !sigText) {
-        throw {
-          statusCode: 502,
-          code: 'GITHUB_SIGNATURE_FETCH_FAILED',
-          message: 'Không thể tải nội dung chữ ký .sig từ GitHub Release'
-        };
-      }
-
+      updateSignature = await this.downloadReleaseAssetText(signatureAsset);
       downloadUrl = updaterArtifact.browser_download_url;
-      updateSignature = sigText;
       artifactName = updaterArtifact.name;
     }
 
