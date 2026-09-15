@@ -31,12 +31,52 @@ router.get('/update/manifest', async (req, res, next) => {
   }
 });
 
-// Secure redirect/proxy download artifact từ GitHub Private Release sang CDN.
+// Secure proxy download artifact từ GitHub Private Release sang client.
+// Proxy thay vì redirect để đảm bảo Tauri updater (reqwest) nhận được
+// file binary trực tiếp với status 200, tránh lỗi verify signature
+// do redirect chain hoặc signed URL hết hạn.
 router.get('/update/download', async (req, res, next) => {
   try {
     const downloadUrl = await releaseService.getDownloadUrl(req.query.v || req.query.version);
     if (!downloadUrl) return res.status(404).json({ error: 'Release artifact not found' });
-    return res.redirect(302, downloadUrl);
+
+    console.log(`[download] Proxying ${req.query.v || req.query.version}`);
+
+    // Fetch from GitHub and proxy to client
+    const response = await fetch(downloadUrl, {
+      headers: {
+        Accept: 'application/octet-stream',
+      },
+      redirect: 'manual',
+    });
+
+    // Follow redirect if any (do NOT send Authorization to storage URL)
+    let fileUrl = downloadUrl;
+    if (response.status === 302 || response.status === 301) {
+      const location = response.headers.get('location');
+      if (location) {
+        fileUrl = location;
+      }
+    }
+
+    const fileResponse = await fetch(fileUrl, {
+      headers: { Accept: 'application/octet-stream' },
+    });
+
+    if (!fileResponse.ok) {
+      return res.status(fileResponse.status).json({ error: 'Failed to fetch artifact' });
+    }
+
+    // Set headers for streaming
+    const contentType = fileResponse.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = fileResponse.headers.get('content-length');
+    if (contentLength) res.set('Content-Length', contentLength);
+    res.set('Content-Type', contentType);
+    res.set('X-Download-Source', 'proxy');
+
+    // Stream the file
+    const body = await fileResponse.arrayBuffer();
+    return res.send(Buffer.from(body));
   } catch (err) {
     if (err.statusCode) {
       return sendError(res, err.statusCode, err.code, err.message);

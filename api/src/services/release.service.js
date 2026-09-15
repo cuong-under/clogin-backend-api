@@ -425,7 +425,9 @@ class ReleaseService {
           // Tuyệt đối không gửi header Authorization tới signed storage URL
           const fileRes = await fetch(location);
           if (fileRes.ok) {
-            const text = await fileRes.text();
+            // Dùng arrayBuffer cho binary-safe, tránh lỗi encoding khi tải .sig (binary data)
+            const buf = await fileRes.arrayBuffer();
+            const text = Buffer.from(buf).toString('utf-8');
             if (text && text.trim()) return text.trim();
           }
         } else if (redirectRes.ok) {
@@ -442,7 +444,9 @@ class ReleaseService {
       try {
         const resp = await fetch(asset.browser_download_url, { headers });
         if (resp.ok) {
-          const text = await resp.text();
+          // Dùng arrayBuffer cho binary-safe
+          const buf = await resp.arrayBuffer();
+          const text = Buffer.from(buf).toString('utf-8');
           if (text && text.trim()) return text.trim();
         }
       } catch {
