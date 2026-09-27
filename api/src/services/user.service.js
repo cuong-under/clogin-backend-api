@@ -2,6 +2,8 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { hashPw, verifyPw } = require('../utils/hash');
 const { signUserJwt } = require('../utils/jwt');
+const { isValidEmail } = require('../utils/validators');
+const { revokeJti } = require('../utils/revocation');
 
 const PASSWORD_RULE = 'Mật khẩu phải có ít nhất 8 ký tự, gồm ít nhất 1 chữ cái và 1 chữ số';
 
@@ -18,6 +20,9 @@ class UserService {
   async registerOwner({ email, password, license_key }) {
     if (!email) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Vui lòng nhập địa chỉ email' };
+    }
+    if (!isValidEmail(email)) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Địa chỉ email không hợp lệ' };
     }
     validatePassword(password);
     if (!license_key) {
@@ -93,7 +98,9 @@ class UserService {
         }
       }).catch(() => {});
 
-      throw { statusCode: 404, code: 'USER_NOT_FOUND', message: 'Tài khoản chưa tồn tại trên hệ thống' };
+      // Trả CÙNG mã lỗi 401 như sai mật khẩu (trước đây 404
+      // USER_NOT_FOUND) → attacker không thể dò email đã đăng ký.
+      throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email hoặc mật khẩu không chính xác' };
     }
 
     if (!verifyPw(password, user.password_hash)) {
@@ -110,23 +117,25 @@ class UserService {
         }
       }).catch(() => {});
 
-      throw { statusCode: 401, code: 'INVALID_PASSWORD', message: 'Mật khẩu không chính xác' };
+      throw { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Email hoặc mật khẩu không chính xác' };
     }
 
-    if (userType === 'worker' && !user.active) {
+    // Owner bị khóa (active=false) phải bị chặn như worker — trước đây chỉ
+    // worker kiểm tra active, owner bị vô hiệu vẫn đăng nhập được.
+    if (!user.active) {
       prisma.loginHistory.create({
         data: {
           user_id: user.id,
-          user_type: 'worker',
+          user_type: userType,
           email,
           ip_address: ip,
           user_agent: userAgent,
           success: false,
-          fail_reason: 'WORKER_DISABLED'
+          fail_reason: 'ACCOUNT_DISABLED'
         }
       }).catch(() => {});
 
-      throw { statusCode: 403, code: 'FORBIDDEN', message: 'Tài khoản worker đã bị vô hiệu hóa' };
+      throw { statusCode: 403, code: 'FORBIDDEN', message: 'Tài khoản đã bị vô hiệu hóa. Liên hệ quản trị viên.' };
     }
 
     const ownerId = userType === 'owner' ? user.id : user.owner_id;

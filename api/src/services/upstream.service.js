@@ -5,12 +5,23 @@ const CONFIG_KEY = 'upstream_sync_config';
 const DEFAULT_UPSTREAM = 'ProxyShard/ShardBrowser';
 const DEFAULT_ORIGIN = 'cuong-under/CloginStudio';
 
+// GitHub PAT chỉ tồn tại phía server. API KHÔNG bao giờ trả token thật về
+// client (portal Next.js) — trước đây trả nguyên văn, kể cả role viewer
+// đọc được PAT có quyền Contents RW + Actions RW.
+function maskToken(t) {
+  if (!t) return '';
+  if (t.length <= 8) return '****';
+  return `${t.slice(0, 4)}…${t.slice(-4)}`;
+}
+
 class UpstreamService {
   async getConfig() {
     const configRow = await prisma.systemConfig.findUnique({ where: { key: CONFIG_KEY } });
     const val = configRow ? configRow.value : {};
+    const token = val.github_token || process.env.GITHUB_TOKEN || '';
     return {
-      github_token: val.github_token || process.env.GITHUB_TOKEN || '',
+      github_token_configured: !!token,
+      github_token_masked: maskToken(token),
       upstream_repo: val.upstream_repo || DEFAULT_UPSTREAM,
       origin_repo: val.origin_repo || DEFAULT_ORIGIN,
       target_branch: val.target_branch || 'main',
@@ -19,13 +30,14 @@ class UpstreamService {
   }
 
   async updateConfig(data) {
-    const current = await this.getConfig();
+    const current = await prisma.systemConfig.findUnique({ where: { key: CONFIG_KEY } });
+    const currentVal = current ? current.value : {};
     const newConfig = {
-      github_token: data.github_token !== undefined ? data.github_token : current.github_token,
-      upstream_repo: data.upstream_repo || current.upstream_repo,
-      origin_repo: data.origin_repo || current.origin_repo,
-      target_branch: data.target_branch || current.target_branch,
-      release_branch: (data.release_branch === 'refactor/code-organization' ? 'main' : (data.release_branch || current.release_branch))
+      github_token: data.github_token !== undefined && data.github_token !== '' ? data.github_token : currentVal.github_token,
+      upstream_repo: data.upstream_repo || DEFAULT_UPSTREAM,
+      origin_repo: data.origin_repo || DEFAULT_ORIGIN,
+      target_branch: data.target_branch || 'main',
+      release_branch: (data.release_branch === 'refactor/code-organization' ? 'main' : (data.release_branch || currentVal.release_branch || 'main'))
     };
 
     await prisma.systemConfig.upsert({
@@ -34,7 +46,15 @@ class UpstreamService {
       create: { key: CONFIG_KEY, value: newConfig }
     });
 
-    return newConfig;
+    // Response cũng mask.
+    return {
+      github_token_configured: !!newConfig.github_token,
+      github_token_masked: maskToken(newConfig.github_token),
+      upstream_repo: newConfig.upstream_repo,
+      origin_repo: newConfig.origin_repo,
+      target_branch: newConfig.target_branch,
+      release_branch: newConfig.release_branch
+    };
   }
 
   async getHeaders(config) {

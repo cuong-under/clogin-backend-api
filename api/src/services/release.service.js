@@ -495,14 +495,17 @@ class ReleaseService {
     let updateSignature = null;
     let artifactName = null;
 
-    // 1. Kiểm tra latest.json nếu có (Tauri v2 updater manifest)
+    // 1. Kiểm tra latest.json nếu có (Tauri v2 updater manifest).
+    //    Chỉ nhận artifact Windows-x86_64 — bỏ fallback "platform đầu tiên"
+    //    vì map key-order không đảm bảo, có thể chọn nhầm artifact macOS
+    //    đẩy xuống client Windows.
     const latestJsonAsset = (githubRelease.assets || []).find((asset) => asset.name === 'latest.json');
     if (latestJsonAsset) {
       try {
         const latestText = await this.downloadReleaseAssetText(latestJsonAsset);
         const latestData = JSON.parse(latestText);
         const platforms = latestData.platforms || {};
-        const target = platforms['windows-x86_64-nsis'] || platforms['windows-x86_64'] || Object.values(platforms)[0];
+        const target = platforms['windows-x86_64-nsis'] || platforms['windows-x86_64'];
         if (target && target.url && target.signature) {
           downloadUrl = target.url;
           updateSignature = target.signature.trim();
@@ -619,6 +622,9 @@ class ReleaseService {
     return {
       latest: release.version,
       url: downloadUrl,
+      // Client đọc min_version để tự ép update khi bản hiện tại quá cũ
+      // (client hiện chưa đọc → thêm field không phá vỡ tương thích).
+      min_version: release.min_version || null,
       changelog: release.changelog || `Phiên bản phát hành Clogin Studio v${release.version}`
     };
   }
@@ -652,7 +658,10 @@ class ReleaseService {
       notes: release.changelog || `Phiên bản Clogin Studio v${release.version}`,
       pub_date: release.published_at.toISOString(),
       url: downloadUrl,
-      signature: release.update_signature.trim()
+      signature: release.update_signature.trim(),
+      // Bản tối thiểu được phép chạy sau update này. Tauri updater bỏ qua
+      // field lạ → an toàn cho client cũ.
+      min_version: release.min_version || null
     };
   }
 

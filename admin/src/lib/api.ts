@@ -1,17 +1,16 @@
-import { getStoredAdminToken, setStoredAdminToken, setStoredAdmin } from './auth';
+import { setStoredAdmin } from './auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-clogin.nghemmo.com';
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = getStoredAdminToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options?.headers as Record<string, string>),
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
+  // Xác thực bằng httpOnly cookie (credentials: 'include'). KHÔNG gửi
+  // Authorization: Bearer từ localStorage — token ở localStorage bị XSS
+  // đọc được; httpOnly cookie thì không.
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     credentials: 'include',
@@ -19,7 +18,6 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   });
   if (res.status === 401) {
     if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-      setStoredAdminToken(null);
       setStoredAdmin(null);
       window.location.href = '/login';
     }

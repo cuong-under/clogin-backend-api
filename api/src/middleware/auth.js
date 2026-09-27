@@ -2,6 +2,7 @@ const { verifyUserJwt } = require('../utils/jwt');
 const { sendError } = require('./error');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { isRevoked } = require('../utils/revocation');
 
 function authMw(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -13,6 +14,10 @@ function authMw(req, res, next) {
   if (!authResult || !authResult.valid) {
     const code = authResult?.reason === 'EXPIRED' ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID';
     return sendError(res, 401, code, 'Token không hợp lệ hoặc đã hết hạn');
+  }
+  // Token đã đăng xuất / bị thu hồi (jti) → từ chối dù chưa hết hạn.
+  if (isRevoked(authResult.payload?.jti)) {
+    return sendError(res, 401, 'TOKEN_REVOKED', 'Phiên đăng nhập đã bị thu hồi, vui lòng đăng nhập lại');
   }
   req.user = authResult.payload;
   next();

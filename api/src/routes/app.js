@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { Readable } = require('stream');
 const releaseService = require('../services/release.service');
 const systemService = require('../services/system.service');
 const { sendError } = require('../middleware/error');
@@ -74,9 +75,14 @@ router.get('/update/download', async (req, res, next) => {
     res.set('Content-Type', contentType);
     res.set('X-Download-Source', 'proxy');
 
-    // Stream the file
-    const body = await fileResponse.arrayBuffer();
-    return res.send(Buffer.from(body));
+    // Stream trực tiếp GitHub → client. Trước đây nạp cả file vào RAM
+    // (arrayBuffer) rồi mới gửi → installer vài trăm MB làm container bị
+    // OOM khi nhiều client cùng tải.
+    if (!fileResponse.body) {
+      return res.status(502).json({ error: 'Upstream không trả body' });
+    }
+    Readable.fromWeb(fileResponse.body).pipe(res);
+    return;
   } catch (err) {
     if (err.statusCode) {
       return sendError(res, err.statusCode, err.code, err.message);

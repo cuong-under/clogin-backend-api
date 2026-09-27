@@ -12,10 +12,22 @@ function isConfigured() {
 }
 
 function assertMasterKey() {
-  if (!process.env.PROXY_VAULT_MASTER_KEY || Buffer.byteLength(process.env.PROXY_VAULT_MASTER_KEY, 'utf8') !== 32) {
+  const raw = process.env.PROXY_VAULT_MASTER_KEY;
+  if (!raw) {
     throw new Error('ProxyVault: PROXY_VAULT_MASTER_KEY phải có đúng 32 bytes. Server từ chối khởi động.');
   }
-  return Buffer.from(process.env.PROXY_VAULT_MASTER_KEY, 'utf8');
+  // Chấp nhận 2 dạng: hex 64 ký tự (32 bytes entropy, khuyến nghị) hoặc
+  // chuỗi thô đúng 32 bytes (legacy).
+  let key;
+  if (/^[0-9a-fA-F]{64}$/.test(raw)) {
+    key = Buffer.from(raw, 'hex');
+  } else {
+    key = Buffer.from(raw, 'utf8');
+  }
+  if (key.length !== 32) {
+    throw new Error('ProxyVault: PROXY_VAULT_MASTER_KEY phải có đúng 32 bytes. Server từ chối khởi động.');
+  }
+  return key;
 }
 
 function encryptCredential(credential) {

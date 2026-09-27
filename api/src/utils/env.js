@@ -7,7 +7,10 @@ function getEnv(name) {
 }
 
 function isDev() {
-  const nodeEnv = process.env.NODE_ENV || 'development';
+  // Mặc định là PRODUCTION. Chỉ coi là dev khi NODE_ENV khai báo rõ ràng
+  // development hoặc test. Trước đây thiếu NODE_ENV (vd Dockerfile không set)
+  // sẽ rơi vào 'development' và dùng secret fallback hardcode — đã vá.
+  const nodeEnv = process.env.NODE_ENV;
   return nodeEnv === 'development' || nodeEnv === 'test';
 }
 

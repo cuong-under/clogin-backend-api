@@ -19,10 +19,14 @@ const releaseService = require('../services/release.service');
 const analyticsService = require('../services/analytics.service');
 const systemService = require('../services/system.service');
 const upstreamService = require('../services/upstream.service');
+const { revokeFromPayload } = require('../utils/revocation');
 
 const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
-const ADMIN_DEFAULT_PASSWORD = requireSecret('ADMIN_DEFAULT_PASSWORD', 'CloginAdmin2026!');
-const ADMIN_PASSWORD_ENV = process.env.ADMIN_PASSWORD;
+
+// LƯU Ý BẢO MẬT: endpoint legacy POST /admin/login (so sánh password
+// hardcode, cấp token super_admin) đã bị XOÁ HOÀN TOÀN. Mọi đăng nhập
+// quản trị phải qua POST /admin/auth/login (kiểm tra adminUser trong DB
+// bằng scrypt hash). Không thêm lại bất kỳ đường login nào không tra DB.
 
 // Giới hạn theo IP cho login admin (5 req/phút).
 const adminLoginLimiter = createRateLimiter('admin-login', 5, 60000, 'Quá nhiều lần đăng nhập quản trị, vui lòng thử lại sau 1 phút');
@@ -101,18 +105,8 @@ router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
 
     const cookieOpts = { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true };
 
-    // Fallback default super admin
-    if (!adminUser && email === ADMIN_DEFAULT_EMAIL && password === ADMIN_DEFAULT_PASSWORD) {
-      const token = signAdminJwt({ sub: 'super-admin-root', email: ADMIN_DEFAULT_EMAIL, role: 'super_admin' });
-      res.cookie('clogin_admin_token', token, cookieOpts);
-      res.cookie('clogin_admin_session', token, cookieOpts);
-      return res.status(200).json({
-        success: true,
-        token,
-        admin: { id: 'super-admin-root', email: ADMIN_DEFAULT_EMAIL, name: 'Super Admin', role: 'super_admin' }
-      });
-    }
-
+    // KHÔNG có fallback super-admin hardcode password nữa. Chỉ đăng nhập
+    // bằng adminUser trong DB (scrypt hash).
     if (!adminUser || !verifyPw(password, adminUser.password_hash)) {
       return sendError(res, 401, 'INVALID_CREDENTIALS', 'Email hoặc mật khẩu quản trị không chính xác');
     }
@@ -121,16 +115,14 @@ router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
       return sendError(res, 403, 'FORBIDDEN', 'Tài khoản quản trị đã bị vô hiệu hóa');
     }
 
-    const adminId = adminUser ? adminUser.id : 'super-admin-root';
-    const adminEmail = adminUser ? adminUser.email : ADMIN_DEFAULT_EMAIL;
-    const adminRole = adminUser ? adminUser.role : 'super_admin';
+    const adminId = adminUser.id;
+    const adminEmail = adminUser.email;
+    const adminRole = adminUser.role;
 
-    if (adminUser) {
-      prisma.adminUser.update({
-        where: { id: adminUser.id },
-        data: { last_login_at: new Date() }
-      }).catch(() => {});
-    }
+    prisma.adminUser.update({
+      where: { id: adminUser.id },
+      data: { last_login_at: new Date() }
+    }).catch(() => {});
 
     const token = signAdminJwt({ sub: adminId, email: adminEmail, role: adminRole });
 
@@ -152,27 +144,20 @@ router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
   }
 });
 
-// Legacy single-password login endpoint compatibility
-router.post('/login', adminLoginLimiter, async (req, res, next) => {
-  try {
-    const { password, email } = req.body;
-    const inputEmail = email || ADMIN_DEFAULT_EMAIL;
-    const inputPassword = password;
-
-    if (inputPassword === ADMIN_DEFAULT_PASSWORD || (ADMIN_PASSWORD_ENV && inputPassword === ADMIN_PASSWORD_ENV)) {
-      const token = signAdminJwt({ sub: 'super-admin-root', email: inputEmail, role: 'super_admin' });
-      res.cookie('clogin_admin_token', token, { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true });
-      res.cookie('clogin_admin_session', token, { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true });
-      return res.status(200).json({ success: true, token });
-    }
-
-    return req.url = '/auth/login', router.handle(req, res, next);
-  } catch (err) {
-    next(err);
-  }
-});
+// Endpoint legacy /login (single-password, không tra DB) đã bị xoá hoàn toàn.
+// Dùng POST /auth/login bên dưới (verify hash trong DB).
 
 router.post('/auth/logout', (req, res) => {
+  // Thu hồi jti của phiên admin hiện tại (nếu có) rồi mới xoá cookie.
+  let token = req.cookies?.clogin_admin_token || req.cookies?.clogin_admin_session;
+  if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+    token = req.headers.authorization.slice(7);
+  }
+  if (token) {
+    const { verifyAdminJwt } = require('../utils/jwt');
+    const result = verifyAdminJwt(token);
+    if (result?.valid) revokeFromPayload(result.payload);
+  }
   res.clearCookie('clogin_admin_token', { path: '/' });
   res.clearCookie('clogin_admin_session', { path: '/' });
   return res.status(200).json({ success: true });
@@ -436,7 +421,14 @@ router.get(['/users/owners/:id/workspaces', '/owners/:id/workspaces'], requireRo
 
 router.post(['/users/owners/:id/reset-password', '/owners/:id/reset-password'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
-    const newPassword = req.body.password || req.body.new_password || ('Clogin' + Math.floor(100000 + Math.random() * 900000));
+    const crypto = require('crypto');
+    // Mật khẩu phải đạt rule của validatePassword (>=8 ký tự, có chữ và số).
+    // Math.random() là PRNG yếu → mật khẩu sinh ra đoán được. Dùng CSPRNG.
+    const genPassword = () => {
+      const raw = crypto.randomBytes(8).toString('base64url').replace(/[^a-zA-Z0-9]/g, '');
+      return `Cg${raw}9x`;
+    };
+    const newPassword = req.body.password || req.body.new_password || genPassword();
     const result = await userService.resetOwnerPassword(req.params.id, newPassword);
     return res.status(200).json({ ...result, new_password: newPassword });
   } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }

@@ -1,5 +1,8 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const { encryptCredential, decryptCredential } = require('../utils/vault-crypto');
+
+const MAX_COOKIES = 5000;
 
 class ProfileService {
   async syncCloudProfile(ownerId, { profile_id, name, folder = '', config = {}, assigned_worker_ids = [], revision: expectedRevision, idempotency_key }) {
@@ -11,29 +14,50 @@ class ProfileService {
       where: { id: profile_id }
     });
 
-    // Stale revision conflict: never silently overwrite a newer Cloud revision.
-    if (existing && existing.owner_id === ownerId && expectedRevision !== undefined && existing.sync_revision > expectedRevision) {
-      throw {
-        statusCode: 409,
-        code: 'SYNC_CONFLICT',
-        message: 'Cloud đã có revision mới hơn. Cần refresh trước khi sync.',
-        canonical_revision: existing.sync_revision
-      };
+    if (existing && existing.owner_id !== ownerId) {
+      throw { statusCode: 403, code: 'FORBIDDEN', message: 'Profile không thuộc sở hữu của bạn' };
     }
 
-    const newRevision = existing ? Math.max((expectedRevision || 0), existing.sync_revision) + 1 : (expectedRevision || 1);
+    if (existing) {
+      // Bắt buộc client gửi revision đúng bằng bản trên cloud. Trước đây
+      // thiếu revision thì bỏ qua toàn bộ kiểm tra conflict → ghi đè im
+      // lặng bản mới hơn (mất dữ liệu worker/owner).
+      if (expectedRevision === undefined || expectedRevision === null) {
+        throw {
+          statusCode: 409,
+          code: 'REVISION_REQUIRED',
+          message: 'Client cần gửi revision hiện tại (sync_revision) để tránh ghi đè.',
+          canonical_revision: existing.sync_revision
+        };
+      }
+      if (expectedRevision !== existing.sync_revision) {
+        throw {
+          statusCode: 409,
+          code: 'SYNC_CONFLICT',
+          message: 'Cloud đã có revision mới hơn. Cần refresh trước khi sync.',
+          canonical_revision: existing.sync_revision
+        };
+      }
+    }
+
+    // Revision do SERVER quản lý (monotonic). Trước đây dùng client gửi lên
+    // → client gửi 999999 làm mọi client khác bị 409 vĩnh viễn.
+    const newRevision = existing ? existing.sync_revision + 1 : 1;
+
+    // Gán worker chỉ hợp lệ nếu worker thuộc chính owner này.
+    let nextWorkers = assigned_worker_ids;
+    if (nextWorkers !== undefined && nextWorkers.length > 0) {
+      await this._assertWorkersOwned(ownerId, nextWorkers);
+    }
 
     if (existing) {
-      if (existing.owner_id !== ownerId) {
-        throw { statusCode: 403, code: 'FORBIDDEN', message: 'Profile không thuộc sở hữu của bạn' };
-      }
       await prisma.cloudProfile.update({
         where: { id: profile_id },
         data: {
           name,
           folder: folder || existing.folder,
           config: config || existing.config,
-          assigned_worker_ids: assigned_worker_ids !== undefined ? assigned_worker_ids : existing.assigned_worker_ids,
+          assigned_worker_ids: nextWorkers !== undefined ? nextWorkers : existing.assigned_worker_ids,
           sync_revision: newRevision,
           sync_state: 'synced',
           updated_at: new Date()
@@ -47,7 +71,7 @@ class ProfileService {
           name,
           folder: folder || '',
           config: config || {},
-          assigned_worker_ids: assigned_worker_ids || [],
+          assigned_worker_ids: nextWorkers || [],
           cookies: null,
           sync_revision: newRevision,
           sync_state: 'synced'
@@ -56,6 +80,21 @@ class ProfileService {
     }
 
     return { success: true, sync_revision: newRevision };
+  }
+
+  /// Worker ids phải thuộc owner — chặn gán chéo tenant (IDOR).
+  async _assertWorkersOwned(ownerId, workerIds) {
+    if (!Array.isArray(workerIds) || workerIds.length === 0) return;
+    const owned = await prisma.worker.count({
+      where: { id: { in: workerIds }, owner_id: ownerId }
+    });
+    if (owned !== workerIds.length) {
+      throw {
+        statusCode: 400,
+        code: 'WORKER_NOT_OWNED',
+        message: 'Một hoặc nhiều worker không thuộc tài khoản của bạn'
+      };
+    }
   }
 
   async getCloudProfiles(payload) {
@@ -79,7 +118,7 @@ class ProfileService {
       name: p.name,
       folder: p.folder,
       assigned_worker_ids: p.assigned_worker_ids,
-      has_cookies: p.cookies !== null && Array.isArray(p.cookies) ? p.cookies.length > 0 : !!p.cookies,
+      has_cookies: p.cookies !== null && p.cookies !== undefined && (Array.isArray(p.cookies) ? p.cookies.length > 0 : true),
       created_at: p.created_at.toISOString(),
       updated_at: p.updated_at.toISOString()
     }));
@@ -104,6 +143,10 @@ class ProfileService {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'Bạn chưa được gán quyền truy cập profile này' };
     }
 
+    if (profile.sync_state === 'deleted') {
+      throw { statusCode: 410, code: 'PROFILE_DELETED', message: 'Profile đã bị xoá trên cloud' };
+    }
+
     return {
       id: profile.id,
       name: profile.name,
@@ -122,11 +165,13 @@ class ProfileService {
       throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy profile' };
     }
 
+    // Tombstone: giữ row ở trạng thái 'deleted' (worker chưa kịp pull sẽ
+    // nhận 410 Gone thay vì 404 mơ hồ). Hard delete qua job dọn dẹp sau
+    // grace period — trước đây xoá cứng ngay làm worker xoá nhầm data local.
     await prisma.cloudProfile.update({
       where: { id: profileId },
-      data: { sync_state: 'deleted', updated_at: new Date() }
+      data: { sync_state: 'deleted', assigned_worker_ids: [], updated_at: new Date() }
     });
-    await prisma.cloudProfile.delete({ where: { id: profileId } }).catch(() => {});
     return { success: true };
   }
 
@@ -160,15 +205,23 @@ class ProfileService {
       throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy profile' };
     }
 
+    const nextWorkers = Array.isArray(workerIds) ? workerIds : [];
+    // FIX CRITICAL: trước đây không kiểm tra worker thuộc owner → owner A
+    // gán worker của owner B, worker B đọc được config (proxy/cookie) của A.
+    await this._assertWorkersOwned(ownerId, nextWorkers);
+
     await prisma.cloudProfile.update({
       where: { id: profileId },
       data: {
-        assigned_worker_ids: workerIds,
+        assigned_worker_ids: nextWorkers,
+        // Bump revision để worker đang online biết mình vừa được gán/thu hồi
+        // (trước đây không bump → worker không thấy profile mới tới sync sau).
+        sync_revision: profile.sync_revision + 1,
         updated_at: new Date()
       }
     });
 
-    return { success: true };
+    return { success: true, sync_revision: profile.sync_revision + 1 };
   }
 
   async saveProfileCookies(payload, profileId, cookies = []) {
@@ -188,15 +241,34 @@ class ProfileService {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'Bạn chưa được gán profile này' };
     }
 
+    if (cookies && (!Array.isArray(cookies) || cookies.length > MAX_COOKIES)) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: `Cookie không hợp lệ (tối đa ${MAX_COOKIES} bản ghi)` };
+    }
+
+    // Cookie = credential đăng nhập site mục tiêu → mã hoá envelope trước
+    // khi lưu DB (trước đây lưu plaintext).
+    const cookiesToStore = cookies && cookies.length > 0 ? encryptCredential(cookies) : null;
+
     await prisma.cloudProfile.update({
       where: { id: profileId },
       data: {
-        cookies: cookies || [],
+        cookies: cookiesToStore,
         updated_at: new Date()
       }
     });
 
     return { success: true, count: (cookies || []).length };
+  }
+
+  /// Cookie có thể đang ở dạng envelope mã hoá (mới) hoặc mảng plaintext
+  /// (bản ghi cũ trước khi vá) — giải mã tương thích ngược.
+  _decodeCookies(stored) {
+    if (stored === null || stored === undefined) return [];
+    if (Array.isArray(stored)) return stored; // legacy plaintext
+    if (stored && typeof stored === 'object' && stored.ciphertext) {
+      return decryptCredential(stored);
+    }
+    return [];
   }
 
   async getProfileCookies(payload, profileId) {
@@ -216,7 +288,7 @@ class ProfileService {
       throw { statusCode: 403, code: 'FORBIDDEN', message: 'Bạn chưa được gán profile này' };
     }
 
-    return { cookies: profile.cookies || [] };
+    return { cookies: this._decodeCookies(profile.cookies) };
   }
 
   async deleteProfileCookies(ownerId, profileId) {

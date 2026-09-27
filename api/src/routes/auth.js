@@ -6,6 +6,7 @@ const { createRateLimiter } = require('../middleware/rate-limit');
 const { sendError } = require('../middleware/error');
 const { getClientIp } = require('../utils/validators');
 const { signUserJwt } = require('../utils/jwt');
+const { revokeFromPayload } = require('../utils/revocation');
 
 const registerLimiter = createRateLimiter('register', 3, 3600000, 'Quá nhiều lần thử đăng ký, vui lòng thử lại sau 1 giờ');
 const loginLimiter = createRateLimiter('login', 10, 900000, 'Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 15 phút');
@@ -47,6 +48,14 @@ router.get('/me', authMw, async (req, res, next) => {
     }
     next(err);
   }
+});
+
+// Đăng xuất: thu hồi jti hiện tại. Token còn hạn cũng bị từ chối ở
+// middleware/auth.js. Trước đây JWT vô thời hạn hợp lệ — logout chỉ là xoá
+// phía client, token đánh cắp vẫn dùng được tới khi hết hạn.
+router.post('/logout', authMw, (req, res) => {
+  revokeFromPayload(req.user);
+  return res.status(200).json({ success: true });
 });
 
 router.post('/refresh', authMw, refreshLimiter, (req, res) => {

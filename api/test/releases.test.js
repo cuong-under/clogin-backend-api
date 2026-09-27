@@ -100,6 +100,7 @@ test('configured Current release produces the Tauri dynamic manifest', async () 
     pub_date: '2026-08-02T00:00:00.000Z',
     url: 'https://downloads.example.com/Clogin_1.2.0_x64-setup.nsis.zip',
     signature: 'untrusted comment: signature\nRURERURERURERURERURERURERURERURERURERURERURE=',
+    min_version: null
   });
 });
 
@@ -121,7 +122,13 @@ test('GitHub import stores the signed Windows updater artifact', async () => {
       ]
     })
   });
-  githubResponses.set(signatureUrl, { ok: true, text: async () => 'signed-update-artifact' });
+  githubResponses.set(signatureUrl, {
+    ok: true,
+    // downloadReleaseAssetText đọc arrayBuffer (binary-safe) — mock cũ chỉ có
+    // text nên báo GITHUB_ASSET_FETCH_FAILED dù response ok.
+    arrayBuffer: async () => new TextEncoder().encode('signed-update-artifact').buffer,
+    text: async () => 'signed-update-artifact'
+  });
 
   const result = await releaseService.importGitHubRelease({ version: 'v1.2.0' });
   assert.equal(result.release.version, '1.2.0');

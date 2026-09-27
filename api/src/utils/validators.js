@@ -1,18 +1,21 @@
 const crypto = require('crypto');
 
 function uuid() {
-  return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
+  if (crypto.randomUUID) return crypto.randomUUID();
+  // Fallback cho Node rất củ (không có randomUUID): dùng CSPRNG, không
+  // dùng Math.random (PRNG yếu, id đoán được).
+  const b = crypto.randomBytes(16);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const hex = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 function getClientIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    '127.0.0.1'
-  );
+  // Chỉ tin X-Forwarded-For khi express biết proxy đáng tin (app.set('trust proxy', N)
+  // ở index.js). Không tin trực tiếp header thô — bypass rate limit chỉ bằng
+  // đổi header. req.ip do express resolve qua trusted proxy chain.
+  return req.ip || req.socket?.remoteAddress || '127.0.0.1';
 }
 
 function parsePagination(query) {

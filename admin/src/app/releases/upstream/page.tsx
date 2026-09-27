@@ -35,6 +35,8 @@ export default function UpstreamSyncPage() {
   const [commitTab, setCommitTab] = useState<'pending' | 'all'>('pending');
   const [config, setConfig] = useState<UpstreamConfig>({
     github_token: '',
+    github_token_configured: false,
+    github_token_masked: '',
     upstream_repo: 'ProxyShard/ShardBrowser',
     origin_repo: 'cuong-under/CloginStudio',
     target_branch: 'main',
@@ -85,7 +87,12 @@ export default function UpstreamSyncPage() {
       if (Array.isArray(commitList)) {
         setCommits(commitList);
       }
-      if (configRes?.data) setConfig(configRes.data);
+      if (configRes?.data) {
+        // Field nhạy cảm (github_token_*) hiển thị từ response mask của
+        // server; luôn reset ô nhập token về rỗng — chỉ điền khi muốn thay.
+        const { github_token: _drop, ...rest } = configRes.data as UpstreamConfig & { github_token?: string };
+        setConfig({ ...rest, github_token: '' });
+      }
     } catch (err: any) {
       if (!isPolling) {
         toast.error(err.message || 'Không thể tải dữ liệu Upstream');
@@ -656,14 +663,23 @@ export default function UpstreamSyncPage() {
       >
         <form onSubmit={handleSaveConfig} className="space-y-4">
           <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-300">GitHub Personal Access Token (PAT)</label>
+              <Badge variant={config.github_token_configured ? 'success' : 'warning'}>
+                {config.github_token_configured ? `Đã cấu hình: ${config.github_token_masked}` : 'Chưa cấu hình'}
+              </Badge>
+            </div>
             <Input
-              label="GitHub Personal Access Token (PAT)"
+              label=""
               type="password"
-              placeholder="ghp_xxxxxxxxxxxx"
-              value={config.github_token}
+              placeholder={config.github_token_configured ? 'Để trống nếu không thay đổi token' : 'ghp_xxxxxxxxxxxx'}
+              value={config.github_token || ''}
               onChange={(e) => setConfig({ ...config, github_token: e.target.value })}
             />
-            <p className="text-[11px] text-slate-400">Token Fine-Grained có quyền repo & workflow để tương tác với GitHub API.</p>
+            <p className="text-[11px] text-slate-400">
+              Token Fine-Grained có quyền repo &amp; workflow để tương tác với GitHub API.
+              Server không trả token về trình duyệt — chỉ hiển thị dạng che.
+            </p>
           </div>
 
           <Input

@@ -55,19 +55,21 @@ class LicenseService {
     });
 
     if (!lic) {
-      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ hoặc không tồn tại trên hệ thống' };
+      // Thống nhất 400/LICENSE_INVALID (không phân biệt "key không tồn tại"
+      // vs các lỗi khác) để tránh oracle dò key hợp lệ.
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không hợp lệ hoặc không tồn tại trên hệ thống' };
     }
 
     if (lic.status === 'suspended') {
-      throw { statusCode: 400, code: 'LICENSE_SUSPENDED', message: `License Key đã bị đình chỉ: ${lic.suspend_reason || 'Vi phạm điều khoản'}` };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động hoặc đã bị thu hồi' };
     }
 
     if (lic.status === 'revoked') {
-      throw { statusCode: 400, code: 'LICENSE_REVOKED', message: 'License Key đã bị thu hồi khỏi hệ thống' };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động hoặc đã bị thu hồi' };
     }
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
-      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn sử dụng' };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động hoặc đã hết hạn' };
     }
 
     if (!lic.owner && (owner_id || email)) {
@@ -133,7 +135,7 @@ class LicenseService {
     });
 
     if (!lic) {
-      throw { statusCode: 404, code: 'LICENSE_INVALID', message: 'License Key không tồn tại trên hệ thống' };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không tồn tại trên hệ thống' };
     }
 
     if (lic.status === 'suspended' || lic.status === 'revoked') {
@@ -141,7 +143,7 @@ class LicenseService {
     }
 
     if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
-      throw { statusCode: 400, code: 'LICENSE_EXPIRED', message: 'License Key đã hết hạn sử dụng' };
+      throw { statusCode: 400, code: 'LICENSE_INVALID', message: 'License Key không còn hoạt động hoặc đã hết hạn' };
     }
 
     const dev = lic.devices.find(d => d.hwid === hwid);
@@ -211,8 +213,11 @@ class LicenseService {
 
   async createLicense({ plan, plan_id, plan_name, max_devices = 1, days_valid, notes = '', coupon_code }) {
     const name = plan_name || plan || 'Standard';
-    const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase() + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-    const key = `CLOGIN-${name.replace(/\s+/g, '').toUpperCase()}-${randomStr}`;
+    // Sinh key bằng CSPRNG (crypto.randomBytes) — KHÔNG dùng Math.random()
+    // (PRNG yếu, key đoán được). 2 nhóm × 12 hex chars ≈ 96 bit entropy.
+    const crypto = require('crypto');
+    const randGroup = () => crypto.randomBytes(6).toString('hex').toUpperCase();
+    const key = `CLOGIN-${name.replace(/\s+/g, '').toUpperCase()}-${randGroup()}-${randGroup()}`;
     const expires_at = days_valid ? new Date(Date.now() + days_valid * 24 * 60 * 60 * 1000) : null;
 
     const lic = await prisma.license.create({
@@ -296,15 +301,25 @@ class LicenseService {
   }
 
   async resetDevices(idOrKey) {
+    // Bắt buộc xác định license — trước đây idOrKey rỗng làm deleteMany
+    // xoá thiết bị của TOÀN BỘ license trên hệ thống.
+    if (!idOrKey) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu license id hoặc key' };
+    }
     const lic = await prisma.license.findFirst({
       where: { OR: [{ id: idOrKey }, { key: idOrKey }] }
     });
-    const targetLicId = lic ? lic.id : idOrKey;
-    await prisma.device.deleteMany({ where: { license_id: targetLicId } });
+    if (!lic) {
+      throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy license' };
+    }
+    await prisma.device.deleteMany({ where: { license_id: lic.id } });
     return { success: true, message: 'Đã reset toàn bộ thiết bị của Key' };
   }
 
   async removeDevice(idOrKey, target) {
+    if (!target) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu thông tin thiết bị cần gỡ' };
+    }
     const where = {
       OR: [
         { id: target },

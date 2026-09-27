@@ -227,12 +227,21 @@ export interface Announcement {
 }
 
 export interface SystemConfig {
+  /** Server không trả secret; chỉ có field mask nếu có cấu hình nhạy cảm. */
   jwt_secret?: string;
   jwt_expiry?: string;
   rate_limit_login?: number;
   rate_limit_api?: number;
   maintenance_mode?: boolean;
   maintenance_message?: string;
+  upstream_sync_config?: {
+    github_token: string;
+    github_token_configured?: boolean;
+    upstream_repo?: string;
+    origin_repo?: string;
+    target_branch?: string;
+    release_branch?: string;
+  };
   [key: string]: any;
 }
 
@@ -293,7 +302,12 @@ export interface UpstreamCommit {
 }
 
 export interface UpstreamConfig {
-  github_token: string;
+  /** Chỉ để GHI token mới. API không bao giờ trả token thật về. */
+  github_token?: string;
+  /** Token đã được cấu hình phía server chưa. */
+  github_token_configured: boolean;
+  /** Token đã mask (vd ghp_…abcd) — chỉ để hiển thị. */
+  github_token_masked: string;
   upstream_repo: string;
   origin_repo: string;
   target_branch: string;

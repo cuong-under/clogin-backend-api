@@ -67,6 +67,8 @@ router.post('/cloud/:id/cookies', authMw, async (req, res, next) => {
 router.get('/cloud/:id/cookies', authMw, async (req, res, next) => {
   try {
     const result = await profileService.getProfileCookies(req.user, req.params.id);
+    // Cookie = credential → không được cache ở bất kỳ tầng trung gian nào.
+    res.set('Cache-Control', 'no-store');
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {

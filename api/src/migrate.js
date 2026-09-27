@@ -7,7 +7,22 @@ const { hashPw } = require('./utils/hash');
 const { requireSecret } = require('./utils/env');
 
 const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
-const ADMIN_DEFAULT_PASSWORD = requireSecret('ADMIN_DEFAULT_PASSWORD', 'CloginAdmin2026!');
+
+// Mật khẩu super admin khởi tạo: ưu tiên ADMIN_INITIAL_PASSWORD từ env;
+// nếu không có, sinh random 1 lần và in ra console (BẮT BUỘC lưu lại/đổi
+// ngay). KHÔNG hardcode fallback password trong source.
+function resolveInitialAdminPassword() {
+  const fromEnv = process.env.ADMIN_INITIAL_PASSWORD;
+  if (fromEnv && fromEnv.trim()) return fromEnv;
+  const crypto = require('crypto');
+  const generated = crypto.randomBytes(12).toString('base64url');
+  console.warn('================================================================');
+  console.warn('[Seed] ADMIN_INITIAL_PASSWORD chưa được set — mật khẩu random:');
+  console.warn(`[Seed]   ${generated}`);
+  console.warn('[Seed] HÃY ĐĂNG NHẬP VÀ ĐỔI MẬT KHẨU NGAY. Chuỗi này chỉ in 1 lần.');
+  console.warn('================================================================');
+  return generated;
+}
 
 function loadJsonFile(fp) {
   try {
@@ -26,10 +41,11 @@ async function runMigration() {
   // 1. Seed Default Super Admin User
   const existingAdmin = await prisma.adminUser.findUnique({ where: { email: ADMIN_DEFAULT_EMAIL } });
   if (!existingAdmin) {
+    const initialPassword = resolveInitialAdminPassword();
     await prisma.adminUser.create({
       data: {
         email: ADMIN_DEFAULT_EMAIL,
-        password_hash: hashPw(ADMIN_DEFAULT_PASSWORD),
+        password_hash: hashPw(initialPassword),
         name: 'Super Admin',
         role: 'super_admin',
         active: true

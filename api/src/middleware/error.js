@@ -5,7 +5,14 @@ function sendError(res, statusCode, code, message, details = {}) {
 }
 
 function errorHandler(err, req, res, next) {
-  console.error('[Error Handler]:', err);
+  // Chỉ log message + code. Stack trace chỉ khi dev — tránh rò cấu trúc DB,
+  // query, email vào log tập trung.
+  const { isDev } = require('../utils/env');
+  if (isDev()) {
+    console.error('[Error Handler]:', err);
+  } else {
+    console.error('[Error Handler]:', err && err.message ? err.message : String(err));
+  }
   if (res.headersSent) {
     return next(err);
   }

@@ -1,7 +1,15 @@
 const crypto = require('crypto');
+const { requireSecret } = require('./env');
 
-const SECRET = process.env.WORKSPACE_AI_GRANT_SECRET || process.env.JWT_SECRET || 'clogin-ai-grant-dev';
+// Secret riêng cho grant, KHÔNG fallback, KHÔNG dùng lại JWT_SECRET
+// (nguyên tắc tách biệt khoá theo mục đích). Thiếu env → fail-fast lúc khởi động.
+const SECRET = requireSecret('WORKSPACE_AI_GRANT_SECRET');
 const TTL_MS = 120000; // 2 minutes short-lived grant
+
+// Khoá tạm để enforce one-time grant. Production 1 process thì RAM đủ;
+// nếu scale multi-process/instance sau này → chuyển Redis (cùng pool key).
+const usedGrants = new Set(); // jti đã dùng
+setInterval(() => usedGrants.clear(), TTL_MS).unref?.();
 
 function sha256(obj) {
   return crypto.createHash('sha256').update(JSON.stringify(obj)).digest('hex');
@@ -15,6 +23,13 @@ function b64urld(str) {
   return Buffer.from(str, 'base64url').toString('utf8');
 }
 
+function constantTimeEqual(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 /**
  * One-time, short-lived tool grant bound to actor/workspace/tool/capability,
  * parameter digest and expiry. Signed server-side; never includes secrets or
@@ -23,6 +38,7 @@ function b64urld(str) {
 function createGrant({ actorId, workspaceId, toolName, capability, actionClass, parameterDigest, policyRevision }) {
   const now = Date.now();
   const payload = {
+    jti: crypto.randomUUID(),
     actorId,
     workspaceId,
     toolName,
@@ -46,7 +62,7 @@ function verifyGrant(token) {
   const body = parts[0];
   const sig = parts[parts.length - 1];
   const expected = crypto.createHmac('sha256', SECRET).update(body).digest('base64url');
-  if (sig !== expected) return { valid: false, reason: 'INVALID' };
+  if (!constantTimeEqual(sig, expected)) return { valid: false, reason: 'INVALID' };
   let payload;
   try {
     payload = JSON.parse(b64urld(body));
@@ -54,6 +70,11 @@ function verifyGrant(token) {
     return { valid: false, reason: 'INVALID' };
   }
   if (payload.exp && payload.exp < Date.now()) return { valid: false, reason: 'EXPIRED' };
+  // One-time: chặn replay grant trong cửa sổ TTL 2 phút.
+  if (payload.jti) {
+    if (usedGrants.has(payload.jti)) return { valid: false, reason: 'GRANT_ALREADY_USED' };
+    usedGrants.add(payload.jti);
+  }
   return { valid: true, payload };
 }
 

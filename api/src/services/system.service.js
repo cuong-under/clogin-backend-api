@@ -202,23 +202,86 @@ class SystemService {
   }
 
   // --- System Config ---
+  // Chỉ cho phép ghi các key cấu hình đã biết. Trước đây upsert BẤT KỲ key
+  // nào client gửi → kể cả 'upstream_sync_config' chứa GitHub PAT (ghi đè
+  // token), chỉ cần quyền admin thường.
+  static CONFIG_KEYS = [
+    'upstream_sync_config',
+    'app_settings',
+    'telemetry_config',
+    'registration_enabled',
+    'maintenance_mode',
+    'maintenance_message',
+    'jwt_expiry',
+    'rate_limit_login',
+    'rate_limit_api'
+  ];
+
+  // Key chứa secret — không bao giờ trả raw về client.
+  static SENSITIVE_CONFIG_KEYS = ['upstream_sync_config'];
+
+  // Mask secret trong response. Generic /v1/admin/settings/config trả MỌI
+  // row system_config, từng bao gồm github_token nguyên văn (kể cả cho role
+  // viewer) — C5.
+  static sanitizeConfig(configMap) {
+    const out = { ...configMap };
+    for (const key of SystemService.SENSITIVE_CONFIG_KEYS) {
+      const val = out[key];
+      if (val && typeof val === 'object' && val.github_token) {
+        const token = String(val.github_token);
+        out[key] = {
+          ...val,
+          github_token: token.length > 8 ? `${token.slice(0, 4)}…${token.slice(-4)}` : '****',
+          github_token_configured: true
+        };
+      } else if (val && typeof val === 'object') {
+        out[key] = { ...val, github_token_configured: false };
+      }
+    }
+    return out;
+  }
+
   async getConfig() {
     const configs = await prisma.systemConfig.findMany();
     const configMap = {};
     configs.forEach(c => {
       configMap[c.key] = c.value;
     });
-    return configMap;
+    return SystemService.sanitizeConfig(configMap);
   }
 
   async updateConfig(keyValues) {
-    const operations = Object.entries(keyValues).map(([key, value]) =>
-      prisma.systemConfig.upsert({
+    if (!keyValues || typeof keyValues !== 'object' || Array.isArray(keyValues)) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Cấu hình không hợp lệ' };
+    }
+    const rejected = Object.keys(keyValues).filter((key) => !SystemService.CONFIG_KEYS.includes(key));
+    if (rejected.length > 0) {
+      throw {
+        statusCode: 400,
+        code: 'CONFIG_KEY_NOT_ALLOWED',
+        message: `Key cấu hình không được phép: ${rejected.join(', ')}`
+      };
+    }
+    const operations = Object.entries(keyValues).map(async ([key, value]) => {
+      // Token nhạy cảm: portal Settings gửi lại CẢ object config vừa đọc —
+      // trong đó github_token đã bị mask. Nếu ghi đè bằng giá trị mask thì
+      // token thật mất. Token mask (chứa '…' hoặc '****') = chưa nhập mới
+      // → giữ nguyên token hiện tại trong DB.
+      let nextValue = value;
+      if (key === 'upstream_sync_config' && value && typeof value === 'object') {
+        const current = await prisma.systemConfig.findUnique({ where: { key } });
+        const currentVal = (current && current.value) || {};
+        const token = value.github_token;
+        if (token === undefined || token === '' || token === '****' || String(token).includes('…')) {
+          nextValue = { ...value, github_token: currentVal.github_token };
+        }
+      }
+      return prisma.systemConfig.upsert({
         where: { key },
-        update: { value, updated_at: new Date() },
-        create: { key, value }
-      })
-    );
+        update: { value: nextValue, updated_at: new Date() },
+        create: { key, value: nextValue }
+      });
+    });
     await Promise.all(operations);
     return this.getConfig();
   }
@@ -243,6 +306,12 @@ class SystemService {
   async createAdminUser({ email, password, name = '', role = 'viewer' }) {
     if (!email || !password) {
       throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Thiếu email hoặc password cho tài khoản quản trị' };
+    }
+    // Whitelist role — trước đây role chuỗi tự do, verifyJwt cast thẳng
+    // req.admin.role nên tạo được admin với role bất kỳ.
+    const ALLOWED_ROLES = ['super_admin', 'admin', 'operator', 'viewer'];
+    if (!ALLOWED_ROLES.includes(role)) {
+      throw { statusCode: 400, code: 'VALIDATION_ERROR', message: `Role không hợp lệ (chọn: ${ALLOWED_ROLES.join(', ')})` };
     }
 
     const existing = await prisma.adminUser.findUnique({ where: { email } });
@@ -272,7 +341,23 @@ class SystemService {
   async updateAdminUser(id, data) {
     const updateData = {};
     if (data.name !== undefined) updateData.name = data.name;
-    if (data.role) updateData.role = data.role;
+    if (data.role) {
+      const ALLOWED_ROLES = ['super_admin', 'admin', 'operator', 'viewer'];
+      if (!ALLOWED_ROLES.includes(data.role)) {
+        throw { statusCode: 400, code: 'VALIDATION_ERROR', message: 'Role không hợp lệ' };
+      }
+      updateData.role = data.role;
+    }
+    // Không cho tự khóa/tự hạ quyền super_admin cuối cùng → tránh mất
+    // quyền quản trị toàn hệ thống.
+    const target = await prisma.adminUser.findUnique({ where: { id } });
+    if (!target) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy tài khoản quản trị' };
+    if (target.role === 'super_admin') {
+      const activeSuperAdmins = await prisma.adminUser.count({ where: { role: 'super_admin', active: true } });
+      if ((data.active === false || (data.role && data.role !== 'super_admin')) && activeSuperAdmins <= 1) {
+        throw { statusCode: 409, code: 'LAST_SUPER_ADMIN', message: 'Không thể vô hiệu hoặc hạ quyền super_admin cuối cùng' };
+      }
+    }
     if (data.active !== undefined) updateData.active = data.active;
     if (data.password) updateData.password_hash = hashPw(data.password);
 
@@ -291,6 +376,14 @@ class SystemService {
   }
 
   async deleteAdminUser(id) {
+    const target = await prisma.adminUser.findUnique({ where: { id } });
+    if (!target) throw { statusCode: 404, code: 'NOT_FOUND', message: 'Không tìm thấy tài khoản quản trị' };
+    if (target.role === 'super_admin') {
+      const activeSuperAdmins = await prisma.adminUser.count({ where: { role: 'super_admin', active: true } });
+      if (activeSuperAdmins <= 1) {
+        throw { statusCode: 409, code: 'LAST_SUPER_ADMIN', message: 'Không thể xoá super_admin cuối cùng' };
+      }
+    }
     await prisma.adminUser.delete({ where: { id } });
     return { success: true };
   }
