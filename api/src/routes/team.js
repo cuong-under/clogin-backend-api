@@ -3,7 +3,7 @@ const router = express.Router();
 const userService = require('../services/user.service');
 const auditService = require('../services/audit.service');
 const { authMw, requireOwner } = require('../middleware/auth');
-const { sendError } = require('../middleware/error');
+const { sendServiceError } = require('../middleware/error');
 const { getClientIp } = require('../utils/validators');
 
 router.get('/workers', authMw, requireOwner, async (req, res, next) => {
@@ -12,7 +12,7 @@ router.get('/workers', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -34,7 +34,7 @@ router.post('/workers', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -57,7 +57,7 @@ router.put('/workers/:id', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -80,7 +80,7 @@ router.delete('/workers/:id', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -92,7 +92,7 @@ router.get('/audit', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }

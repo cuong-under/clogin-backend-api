@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const licenseService = require('../services/license.service');
-const { sendError } = require('../middleware/error');
+const { sendServiceError } = require('../middleware/error');
 const { getClientIp } = require('../utils/validators');
 const { verifyUserJwt } = require('../utils/jwt');
 const { createRateLimiter } = require('../middleware/rate-limit');
@@ -49,7 +49,7 @@ router.post('/activate', activateLimiter, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -67,7 +67,7 @@ router.post('/verify', verifyLimiter, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }

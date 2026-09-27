@@ -1,7 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const rbac = require('../services/rbac.service');
-const { sendError } = require('./error');
+const { sendError, sendServiceError } = require('./error');
 
 // POLICY_MODES are decided server-side, never trusted from a UI payload:
 //   plan  — read-only
@@ -52,7 +52,7 @@ function requireWorkspaceAuth(req, res, next) {
       next();
     })
     .catch(err => {
-      if (err && err.statusCode) return sendError(res, err.statusCode, err.code, err.message);
+      if (err && err.statusCode) return sendServiceError(res, err);
       next(err);
     });
 }

@@ -3,7 +3,7 @@ const router = express.Router();
 const { Readable } = require('stream');
 const releaseService = require('../services/release.service');
 const systemService = require('../services/system.service');
-const { sendError } = require('../middleware/error');
+const { sendServiceError } = require('../middleware/error');
 
 router.get('/update', async (req, res, next) => {
   try {
@@ -12,7 +12,7 @@ router.get('/update', async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -26,7 +26,7 @@ router.get('/update/manifest', async (req, res, next) => {
     return res.status(200).type('application/json; charset=utf-8').json(manifest);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -85,7 +85,7 @@ router.get('/update/download', async (req, res, next) => {
     return;
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -97,7 +97,7 @@ router.get('/announcements', async (req, res, next) => {
     return res.status(200).json({ announcements });
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -109,7 +109,7 @@ router.get('/features', async (req, res, next) => {
     return res.status(200).json({ features });
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }

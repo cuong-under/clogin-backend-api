@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const profileService = require('../services/profile.service');
 const { authMw, requireOwner } = require('../middleware/auth');
-const { sendError } = require('../middleware/error');
+const { sendServiceError } = require('../middleware/error');
 
 router.post('/cloud/sync', authMw, requireOwner, async (req, res, next) => {
   try {
@@ -10,7 +10,7 @@ router.post('/cloud/sync', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -22,7 +22,7 @@ router.get('/cloud', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -34,7 +34,7 @@ router.get('/cloud/:id/config', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -46,7 +46,7 @@ router.put('/cloud/:id/assign', authMw, requireOwner, async (req, res, next) => 
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -58,7 +58,7 @@ router.post('/cloud/:id/cookies', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -72,7 +72,7 @@ router.get('/cloud/:id/cookies', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -84,7 +84,7 @@ router.delete('/cloud/:id/cookies', authMw, requireOwner, async (req, res, next)
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -96,7 +96,7 @@ router.delete('/cloud/:id', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -113,7 +113,7 @@ router.put('/cloud/:id/sync', authMw, requireOwner, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -125,7 +125,7 @@ router.get('/cloud/:id/sync-status', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }

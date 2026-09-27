@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const { signAdminJwt } = require('../utils/jwt');
 const { verifyPw } = require('../utils/hash');
 const { adminAuth, requireRole } = require('../middleware/admin-auth');
-const { sendError } = require('../middleware/error');
+const { sendError, sendServiceError } = require('../middleware/error');
 const { createRateLimiter } = require('../middleware/rate-limit');
 const { getClientIp, parsePagination } = require('../utils/validators');
 const { requireSecret } = require('../utils/env');
@@ -213,21 +213,21 @@ router.post(['/licenses/plans', '/plans'], requireRole(['super_admin']), async (
   try {
     const plan = await systemService.createPlan(req.body);
     return res.status(200).json({ data: plan, ...plan });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/licenses/plans/:id', '/plans/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const plan = await systemService.updatePlan(req.params.id, req.body);
     return res.status(200).json({ data: plan, ...plan });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/licenses/plans/:id', '/plans/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await systemService.deletePlan(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // Coupons
@@ -242,21 +242,21 @@ router.post(['/licenses/coupons', '/coupons'], requireRole(['super_admin', 'supp
   try {
     const coupon = await systemService.createCoupon(req.body);
     return res.status(200).json({ data: coupon, ...coupon });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/licenses/coupons/:id', '/coupons/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const coupon = await systemService.updateCoupon(req.params.id, req.body);
     return res.status(200).json({ data: coupon, ...coupon });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/licenses/coupons/:id', '/coupons/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await systemService.deleteCoupon(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // Bulk & Action
@@ -264,7 +264,7 @@ router.post('/licenses/bulk-create', requireRole(['super_admin', 'support']), as
   try {
     const result = await licenseService.bulkCreateLicenses(req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/licenses/bulk-delete', requireRole(['super_admin', 'support']), async (req, res, next) => {
@@ -328,63 +328,63 @@ router.post('/licenses', requireRole(['super_admin', 'support']), async (req, re
   try {
     const result = await licenseService.createLicense(req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/licenses/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const license = await licenseService.getLicenseById(req.params.id);
     return res.status(200).json({ data: license, license });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put('/licenses/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.updateLicense(req.params.id, req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete('/licenses/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.deleteLicense(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/licenses/:id/suspend', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.suspendLicense(req.params.id, req.body.reason);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/licenses/:id/reactivate', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.reactivateLicense(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/licenses/:id/extend', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.extendLicense(req.params.id, req.body.days);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/licenses/:id/reset-devices', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.resetDevices(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete('/licenses/:id/devices/:hwid', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await licenseService.removeDevice(req.params.id, req.params.hwid);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== USERS (OWNERS & WORKERS) ====================
@@ -431,7 +431,7 @@ router.post(['/users/owners/:id/reset-password', '/owners/:id/reset-password'], 
     const newPassword = req.body.password || req.body.new_password || genPassword();
     const result = await userService.resetOwnerPassword(req.params.id, newPassword);
     return res.status(200).json({ ...result, new_password: newPassword });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post(['/users/owners/:id/toggle-status', '/owners/:id/toggle-status'], requireRole(['super_admin', 'support']), async (req, res, next) => {
@@ -439,7 +439,7 @@ router.post(['/users/owners/:id/toggle-status', '/owners/:id/toggle-status'], re
     const owner = await userService.getOwnerById(req.params.id);
     const updated = await userService.updateOwner(req.params.id, { active: !owner.active });
     return res.status(200).json({ data: updated, owner: updated });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get(['/users/owners', '/owners'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
@@ -455,21 +455,21 @@ router.get(['/users/owners/:id', '/owners/:id'], requireRole(['super_admin', 'su
     const owner = await userService.getOwnerById(req.params.id);
     const workspaces = await listOwnerWorkspaces(req.params.id);
     return res.status(200).json({ data: { ...owner, workspaces }, owner: { ...owner, workspaces } });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/users/owners/:id', '/owners/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const owner = await userService.updateOwner(req.params.id, req.body);
     return res.status(200).json({ data: owner, owner });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/users/owners/:id', '/owners/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await userService.deleteOwner(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // Workers Sub-Routes
@@ -478,7 +478,7 @@ router.post(['/users/workers/:id/toggle-status', '/workers/:id/toggle-status'], 
     const worker = await userService.getWorkerById(req.params.id);
     const updated = await userService.updateWorkerAdmin(req.params.id, { active: !worker.active });
     return res.status(200).json({ data: updated, worker: updated });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get(['/users/workers/:id/memberships', '/workers/:id/memberships'], requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
@@ -501,21 +501,21 @@ router.get(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin', '
     const worker = await userService.getWorkerById(req.params.id);
     const memberships = await listWorkerMemberships(req.params.id);
     return res.status(200).json({ data: { ...worker, memberships }, worker: { ...worker, memberships } });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const worker = await userService.updateWorkerAdmin(req.params.id, req.body);
     return res.status(200).json({ data: worker, worker });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/users/workers/:id', '/workers/:id'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await userService.deleteWorkerAdmin(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== PROFILES ====================
@@ -643,7 +643,7 @@ router.post('/profiles/:id/transfer', requireRole(['super_admin', 'support']), a
   try {
     const result = await profileService.transferProfile(req.params.id, req.body.new_owner_id || req.body.owner_id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/profiles/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
@@ -651,14 +651,14 @@ router.get('/profiles/:id', requireRole(['super_admin', 'support', 'viewer']), a
     const profile = await profileService.getProfileByIdAdmin(req.params.id);
     const workspaces = await listProfileWorkspaces(req.params.id);
     return res.status(200).json({ data: { ...profile, workspaces }, profile: { ...profile, workspaces } });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete('/profiles/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await profileService.deleteProfileAdmin(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== AUDIT & SECURITY ====================
@@ -711,14 +711,14 @@ router.post(['/security/blocked-ips', '/security/ip-block'], requireRole(['super
   try {
     const result = await auditService.addIpBlock(req.body);
     return res.status(200).json({ data: result, ...result });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/security/blocked-ips/:ip', '/security/ip-block/:ip'], requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await auditService.removeIpBlock(req.params.ip);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== RELEASES ====================
@@ -734,49 +734,49 @@ router.post('/releases', requireRole(['super_admin']), async (req, res, next) =>
   try {
     const release = await releaseService.createRelease(req.body);
     return res.status(200).json(release);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/releases/import-github', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await releaseService.importGitHubRelease(req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/releases/:id/build', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await releaseService.startBuild(req.params.id);
     return res.status(202).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/releases/updater-signing', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await releaseService.getUpdaterSigningStatus();
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put('/releases/updater-signing', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await releaseService.configureUpdaterSigning(req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/releases/:id/build-status', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
   try {
     const release = await releaseService.getBuildStatus(req.params.id);
     return res.status(200).json(release);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/releases/:id/publish', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const release = await releaseService.publishRelease(req.params.id);
     return res.status(200).json(release);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/releases/:id', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
@@ -791,14 +791,14 @@ router.put('/releases/:id', requireRole(['super_admin']), async (req, res, next)
   try {
     const release = await releaseService.updateRelease(req.params.id, req.body);
     return res.status(200).json(release);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete('/releases/:id', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await releaseService.deleteRelease(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== ANNOUNCEMENTS ====================
@@ -814,21 +814,21 @@ router.post('/announcements', requireRole(['super_admin', 'support']), async (re
   try {
     const announcement = await systemService.createAnnouncement(req.body);
     return res.status(200).json(announcement);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put('/announcements/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const announcement = await systemService.updateAnnouncement(req.params.id, req.body);
     return res.status(200).json(announcement);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete('/announcements/:id', requireRole(['super_admin', 'support']), async (req, res, next) => {
   try {
     const result = await systemService.deleteAnnouncement(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== SETTINGS (ADMINS, FEATURE FLAGS, CONFIG) ====================
@@ -845,21 +845,21 @@ router.post(['/settings/admins', '/admin-users'], requireRole(['super_admin']), 
   try {
     const user = await systemService.createAdminUser(req.body);
     return res.status(200).json({ data: user, ...user });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/settings/admins/:id', '/admin-users/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const user = await systemService.updateAdminUser(req.params.id, req.body);
     return res.status(200).json({ data: user, ...user });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/settings/admins/:id', '/admin-users/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await systemService.deleteAdminUser(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // Feature Flags
@@ -874,21 +874,21 @@ router.post(['/settings/feature-flags', '/feature-flags'], requireRole(['super_a
   try {
     const flag = await systemService.createFeatureFlag(req.body);
     return res.status(200).json({ data: flag, ...flag });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.put(['/settings/feature-flags/:id', '/feature-flags/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const flag = await systemService.updateFeatureFlag(req.params.id, req.body);
     return res.status(200).json({ data: flag, ...flag });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.delete(['/settings/feature-flags/:id', '/feature-flags/:id'], requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await systemService.deleteFeatureFlag(req.params.id);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // System Config
@@ -903,7 +903,7 @@ router.put(['/settings/config', '/config'], requireRole(['super_admin']), async 
   try {
     const config = await systemService.updateConfig(req.body);
     return res.status(200).json({ data: config, config });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 // ==================== UPSTREAM SYNC ====================
@@ -919,7 +919,7 @@ router.put('/upstream/config', requireRole(['super_admin']), async (req, res, ne
   try {
     const config = await upstreamService.updateConfig(req.body);
     return res.status(200).json({ data: config, ...config });
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.get('/upstream/status', requireRole(['super_admin', 'support', 'viewer']), async (req, res, next) => {
@@ -933,21 +933,21 @@ router.get('/upstream/commits', requireRole(['super_admin', 'support', 'viewer']
   try {
     const commits = await upstreamService.listUpstreamCommits();
     return res.status(200).json(commits);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/upstream/create-pr', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await upstreamService.createSyncPullRequest();
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 router.post('/upstream/trigger-release', requireRole(['super_admin']), async (req, res, next) => {
   try {
     const result = await upstreamService.triggerReleaseWorkflow(req.body);
     return res.status(200).json(result);
-  } catch (err) { if (err.statusCode) return sendError(res, err.statusCode, err.code, err.message); next(err); }
+  } catch (err) { if (err.statusCode) return sendServiceError(res, err); next(err); }
 });
 
 module.exports = router;

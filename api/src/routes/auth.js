@@ -3,7 +3,7 @@ const router = express.Router();
 const userService = require('../services/user.service');
 const { authMw } = require('../middleware/auth');
 const { createRateLimiter } = require('../middleware/rate-limit');
-const { sendError } = require('../middleware/error');
+const { sendServiceError } = require('../middleware/error');
 const { getClientIp } = require('../utils/validators');
 const { signUserJwt } = require('../utils/jwt');
 const { revokeFromPayload } = require('../utils/revocation');
@@ -18,7 +18,7 @@ router.post('/register', registerLimiter, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -32,7 +32,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
@@ -44,7 +44,7 @@ router.get('/me', authMw, async (req, res, next) => {
     return res.status(200).json(result);
   } catch (err) {
     if (err.statusCode) {
-      return sendError(res, err.statusCode, err.code, err.message);
+      return sendServiceError(res, err);
     }
     next(err);
   }
