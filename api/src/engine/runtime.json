@@ -1,0 +1,24 @@
+{
+  "archives": {
+    "ShardX-Fingerprints.zip": "6ed51c9571b0100a5fa56b578cbc6e118b3d47eb5182759d66be4f55712bb66f",
+    "ShardX-Linux.zip": "3ead1629a1c893f248cd01ee7c9125552b2cac5c91846cb71d6cb1b24883c213",
+    "ShardX-Mac-arm64.zip": "59115cd31ea985d263663e030c698847930b755008d181dd43aa2abbe2be354c",
+    "ShardX-Widevine-Linux.zip": "44fb1a3afd884d650904b88637eef8cede162ea5d302292a7b8813deafb751dc",
+    "ShardX-Widevine-Mac-arm64.zip": "5c2f78dd705e8f842455136eeeb358805cc721288cd268e079676a557eeabf92",
+    "ShardX-Widevine-Win.zip": "8b32e3627b998964aa53670f85756c7bc2127780c2aa5cc06fbf4fd0bcb07862",
+    "ShardX-Windows.zip": "750bcb34d15d286251b58bfbd465f9d44fe023412e2b8ba8d7083f019f084cfc"
+  },
+  "chromium_version": "152.0.7977.65",
+  "grease_brand": "Not)A;Brand",
+  "grease_version": "24",
+  "revision": 4,
+  "sha256": {
+    "ShardX-Fingerprints.zip": "6ed51c9571b0100a5fa56b578cbc6e118b3d47eb5182759d66be4f55712bb66f",
+    "ShardX-Linux.zip": "3ead1629a1c893f248cd01ee7c9125552b2cac5c91846cb71d6cb1b24883c213",
+    "ShardX-Mac-arm64.zip": "59115cd31ea985d263663e030c698847930b755008d181dd43aa2abbe2be354c",
+    "ShardX-Widevine-Linux.zip": "44fb1a3afd884d650904b88637eef8cede162ea5d302292a7b8813deafb751dc",
+    "ShardX-Widevine-Mac-arm64.zip": "5c2f78dd705e8f842455136eeeb358805cc721288cd268e079676a557eeabf92",
+    "ShardX-Widevine-Win.zip": "8b32e3627b998964aa53670f85756c7bc2127780c2aa5cc06fbf4fd0bcb07862",
+    "ShardX-Windows.zip": "750bcb34d15d286251b58bfbd465f9d44fe023412e2b8ba8d7083f019f084cfc"
+  }
+}

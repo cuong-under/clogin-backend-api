@@ -39,7 +39,10 @@ function createRateLimiter(name, maxHits, windowMs, errorMessage, keyFn) {
   };
 }
 
-// Memory cleanup every 10 minutes
+// Memory cleanup every 10 minutes.
+// `.unref()` de timer nay KHONG giu tien trinh song: server that van chay vi
+// con socket dang listen, nhung script/test chi import middleware nay se tu
+// thoat thay vi treo mai (truoc day `node --test` khong bao gio ket thuc).
 setInterval(() => {
   const now = Date.now();
   for (const [key, record] of rateLimitStore.entries()) {
@@ -47,7 +50,7 @@ setInterval(() => {
       rateLimitStore.delete(key);
     }
   }
-}, 600000);
+}, 600000).unref();
 
 module.exports = {
   createRateLimiter

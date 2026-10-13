@@ -1,0 +1,5 @@
+# Chu ky engine (minisign) + manifest: chot xuong dong de khong phu thuoc
+# core.autocrlf cua tung may. Dao dong co the lam minisign parse sai tren may
+# khac — ma loi chi lo ra tren may user, khong lo trong CI.
+api/src/engine/sigs/*.sig -text
+api/src/engine/runtime.json text eol=lf
