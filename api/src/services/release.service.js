@@ -616,7 +616,7 @@ class ReleaseService {
     if (!isUpdateReady(release)) return null;
 
     const downloadUrl = (release.download_url && release.download_url.includes('github.com'))
-      ? `https://api-clogin.nghemmo.com/v1/app/update/download?v=${encodeURIComponent(release.version)}`
+      ? `https://api-clogin.cuong.tech/v1/app/update/download?v=${encodeURIComponent(release.version)}`
       : release.download_url;
 
     return {
@@ -650,7 +650,7 @@ class ReleaseService {
     if (!isUpdateReady(release)) return null;
 
     const downloadUrl = (release.download_url && release.download_url.includes('github.com'))
-      ? `https://api-clogin.nghemmo.com/v1/app/update/download?v=${encodeURIComponent(release.version)}`
+      ? `https://api-clogin.cuong.tech/v1/app/update/download?v=${encodeURIComponent(release.version)}`
       : release.download_url;
 
     return {

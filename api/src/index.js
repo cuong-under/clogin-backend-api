@@ -39,7 +39,12 @@ app.use(helmet({ contentSecurityPolicy: false }));
 
 // CORS Whitelist — KHÔNG cho phép mọi port localhost:xxxx nữa (mọi trang
 // LOCAL trên máy nạn nhân đều gọi được API). Chỉ allowlist port dev thật.
-const allowedOrigins = ['tauri://localhost', 'http://localhost', 'https://api-clogin.nghemmo.com', 'https://clogin.nghemmo.com'];
+const allowedOrigins = [
+  'tauri://localhost',
+  'http://localhost',
+  'https://api-clogin.cuong.tech',
+  'https://clogin.cuong.tech'
+];
 const allowedLocalOrigins = ['http://127.0.0.1:1420', 'http://localhost:1420', 'http://127.0.0.1:3000'];
 app.use(cors({
   origin: (origin, callback) => {

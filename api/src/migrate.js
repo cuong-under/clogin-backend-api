@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const { hashPw } = require('./utils/hash');
 const { requireSecret } = require('./utils/env');
 
-const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
+const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.cuong.tech');
 
 // Mật khẩu super admin khởi tạo: ưu tiên ADMIN_INITIAL_PASSWORD từ env;
 // nếu không có, sinh random 1 lần và in ra console (BẮT BUỘC lưu lại/đổi

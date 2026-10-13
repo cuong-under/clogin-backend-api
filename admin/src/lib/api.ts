@@ -1,6 +1,6 @@
 import { setStoredAdmin } from './auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-clogin.nghemmo.com';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api-clogin.cuong.tech';
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {

@@ -21,7 +21,7 @@ const systemService = require('../services/system.service');
 const upstreamService = require('../services/upstream.service');
 const { revokeFromPayload } = require('../utils/revocation');
 
-const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.nghemmo.com');
+const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.cuong.tech');
 
 // LƯU Ý BẢO MẬT: endpoint legacy POST /admin/login (so sánh password
 // hardcode, cấp token super_admin) đã bị XOÁ HOÀN TOÀN. Mọi đăng nhập

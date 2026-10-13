@@ -12,7 +12,7 @@ const csp = [
   "img-src 'self' data: https:",
   "font-src 'self' data:",
   // Portal chỉ gọi backend API chính thức.
-  "connect-src 'self' https://api-clogin.nghemmo.com",
+  "connect-src 'self' https://api-clogin.cuong.tech",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

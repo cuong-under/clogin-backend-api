@@ -259,7 +259,7 @@ export default function AdminUsersPage() {
           <Input
             label="Email quản trị"
             type="email"
-            placeholder="admin@clogin.nghemmo.com"
+            placeholder="admin@clogin.cuong.tech"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             disabled={!!editingAdmin}

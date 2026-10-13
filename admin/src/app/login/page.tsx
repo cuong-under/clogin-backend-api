@@ -72,7 +72,7 @@ export default function LoginPage() {
             <Input
               label="Email quản trị"
               type="email"
-              placeholder="admin@clogin.nghemmo.com"
+              placeholder="admin@clogin.cuong.tech"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               icon={<Mail className="w-4 h-4 text-[#6b9eb3]" />}

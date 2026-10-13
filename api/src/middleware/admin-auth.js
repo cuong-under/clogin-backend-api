@@ -8,7 +8,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // ADMIN_ALLOWED_ORIGINS (phân tách bằng dấu phẩy) khi đổi domain.
 const ALLOWED_ADMIN_ORIGINS = (
   process.env.ADMIN_ALLOWED_ORIGINS ||
-  'https://clogin.nghemmo.com,https://api-clogin.nghemmo.com,http://localhost:3000'
+  'https://clogin.cuong.tech,https://api-clogin.cuong.tech,http://localhost:3000'
 )
   .split(',')
   .map((s) => s.trim())
