@@ -23,6 +23,27 @@ const { revokeFromPayload } = require('../utils/revocation');
 
 const ADMIN_DEFAULT_EMAIL = requireSecret('ADMIN_DEFAULT_EMAIL', 'admin@clogin.cuong.tech');
 
+// Domain cookie phiên admin (vd `.cuong.tech` ở production — set qua env
+// ADMIN_COOKIE_DOMAIN). Khi portal (clogin.cuong.tech) và API
+// (api-clogin.cuong.tech) trên 2 subdomain khác nhau, cookie PHẢI set trên
+// domain cha chung để Next.js middleware phía portal đọc được
+// `clogin_admin_session` — nếu để host-only (chỉ trên API domain), middleware
+// không bao giờ thấy cookie và redirect mọi trang về /login. Rỗng => host-only
+// (dev localhost vẫn chạy bình thường).
+const ADMIN_COOKIE_DOMAIN = process.env.ADMIN_COOKIE_DOMAIN || '';
+const ADMIN_COOKIE_SET = {
+  httpOnly: true,
+  maxAge: 86400000,
+  path: '/',
+  sameSite: 'none',
+  secure: true,
+  ...(ADMIN_COOKIE_DOMAIN ? { domain: ADMIN_COOKIE_DOMAIN } : {})
+};
+const ADMIN_COOKIE_CLEAR = {
+  path: '/',
+  ...(ADMIN_COOKIE_DOMAIN ? { domain: ADMIN_COOKIE_DOMAIN } : {})
+};
+
 // LƯU Ý BẢO MẬT: endpoint legacy POST /admin/login (so sánh password
 // hardcode, cấp token super_admin) đã bị XOÁ HOÀN TOÀN. Mọi đăng nhập
 // quản trị phải qua POST /admin/auth/login (kiểm tra adminUser trong DB
@@ -103,7 +124,7 @@ router.post('/auth/login', adminLoginLimiter, async (req, res, next) => {
 
     let adminUser = await prisma.adminUser.findUnique({ where: { email } });
 
-    const cookieOpts = { httpOnly: true, maxAge: 86400000, path: '/', sameSite: 'none', secure: true };
+    const cookieOpts = ADMIN_COOKIE_SET;
 
     // KHÔNG có fallback super-admin hardcode password nữa. Chỉ đăng nhập
     // bằng adminUser trong DB (scrypt hash).
@@ -158,14 +179,14 @@ router.post('/auth/logout', (req, res) => {
     const result = verifyAdminJwt(token);
     if (result?.valid) revokeFromPayload(result.payload);
   }
-  res.clearCookie('clogin_admin_token', { path: '/' });
-  res.clearCookie('clogin_admin_session', { path: '/' });
+  res.clearCookie('clogin_admin_token', ADMIN_COOKIE_CLEAR);
+  res.clearCookie('clogin_admin_session', ADMIN_COOKIE_CLEAR);
   return res.status(200).json({ success: true });
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('clogin_admin_token', { path: '/' });
-  res.clearCookie('clogin_admin_session', { path: '/' });
+  res.clearCookie('clogin_admin_token', ADMIN_COOKIE_CLEAR);
+  res.clearCookie('clogin_admin_session', ADMIN_COOKIE_CLEAR);
   return res.status(200).json({ success: true });
 });
 
