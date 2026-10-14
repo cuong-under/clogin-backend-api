@@ -263,16 +263,6 @@ export default function UpstreamSyncPage() {
           </Button>
 
           <Button
-            variant={isUpToDate ? "outline" : "primary"}
-            size="sm"
-            onClick={handleCreateSyncPR}
-            isLoading={actionLoading || isWorkflowRunning}
-            icon={<GitPullRequest className="w-4 h-4" />}
-          >
-            {isWorkflowRunning ? 'Đang chạy Sync...' : isUpToDate ? 'Tạo Sync PR' : 'Tạo Sync PR'}
-          </Button>
-
-          <Button
             variant="primary"
             size="sm"
             onClick={() => setShowReleaseModal(true)}
@@ -452,12 +442,12 @@ export default function UpstreamSyncPage() {
 
       {/* Warning Alert if Behind */}
       {!isUpToDate && status?.behind_by ? status.behind_by > 0 && !status.active_pr && (
-        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h4 className="text-sm font-semibold text-amber-300">Kho nguồn Upstream có bản cập nhật mới</h4>
-            <p className="text-xs text-amber-200/80 mt-1">
-              Đang có <strong>{status.behind_by}</strong> commit mới trên repo gốc <code className="text-amber-300">{config.upstream_repo}</code>. Bấm nút <strong>&quot;Tạo Sync PR&quot;</strong> để tạo nhánh và mở Pull Request đồng bộ.
+            <h4 className="text-sm font-semibold text-cyan-300">Kho nguồn Upstream có commit mới</h4>
+            <p className="text-xs text-cyan-200/80 mt-1">
+              Đang có <strong>{status.behind_by}</strong> commit mới trên repo gốc <code className="text-cyan-300">{config.upstream_repo}</code>. CloginStudio chạy cơ chế <strong>Selective Sync</strong> để bảo vệ các tính năng độc quyền (Auth, License, AI Copilot, Flat Arch). Xem danh sách commit bên dưới để tham khảo và cherry-pick tính năng khi cần.
             </p>
           </div>
         </div>
@@ -467,9 +457,9 @@ export default function UpstreamSyncPage() {
       <Card className="p-5 border border-slate-800">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-base font-semibold text-slate-200">Lịch Sử Commits Từ Upstream</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Lịch sử 30 commit gần nhất từ repo gốc <code className="text-slate-300">{config.upstream_repo}</code>. Nhãn &quot;Đã gộp&quot; xác nhận commit đã có trong nhánh <code className="text-slate-300">{config.target_branch}</code>.
+            <h1 className="text-xl font-bold text-slate-100">Radar Theo Dõi Upstream</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Theo dõi và nhận diện các bản cập nhật mới nhất từ repository nguồn gốc (ProxyShard/ShardBrowser).
             </p>
           </div>
           <a

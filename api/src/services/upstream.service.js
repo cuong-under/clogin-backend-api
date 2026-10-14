@@ -275,6 +275,16 @@ class UpstreamService {
       });
     }
 
+    let matchIndex = upstreamCommits.findIndex(c => {
+      const uSha = c.sha;
+      const uShortSha = c.sha ? c.sha.substring(0, 7) : '';
+      const uAuthorName = (c.commit?.author?.name || '').trim().toLowerCase();
+      const uDate = c.commit?.author?.date || '';
+      const uMsg = (c.commit?.message || '').trim().toLowerCase();
+      const uSig = `${uAuthorName}||${uDate}||${uMsg}`;
+      return originShas.has(uSha) || originShas.has(uShortSha) || originSignatures.has(uSig);
+    });
+
     let mergedCount = 0;
     let pendingCount = 0;
 
