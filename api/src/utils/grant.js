@@ -54,7 +54,7 @@ function createGrant({ actorId, workspaceId, toolName, capability, actionClass, 
   return { token: `${body}.${sig}`, expiresAt: now + TTL_MS };
 }
 
-function verifyGrant(token) {
+function verifyGrant(token, { consume = false } = {}) {
   if (!token || typeof token !== 'string') return { valid: false, reason: 'INVALID' };
   const parts = token.split('.');
   // Tolerate both 2-part (body.sig, our default) and 3-part (body.payload.sig) tokens.
@@ -70,10 +70,12 @@ function verifyGrant(token) {
     return { valid: false, reason: 'INVALID' };
   }
   if (payload.exp && payload.exp < Date.now()) return { valid: false, reason: 'EXPIRED' };
-  // One-time: chặn replay grant trong cửa sổ TTL 2 phút.
+  // Kiểm tra grant đã bị tiêu thụ chưa
   if (payload.jti) {
     if (usedGrants.has(payload.jti)) return { valid: false, reason: 'GRANT_ALREADY_USED' };
-    usedGrants.add(payload.jti);
+    if (consume) {
+      usedGrants.add(payload.jti);
+    }
   }
   return { valid: true, payload };
 }

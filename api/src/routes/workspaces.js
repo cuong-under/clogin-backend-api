@@ -546,22 +546,24 @@ router.post('/:workspaceId/ai/verify-grant', requireWorkspaceAuth, async (req, r
 });
 
 // tool-started / tool-finished bound to a grant correlation id for write auditing.
-function auditGrant(req, res, next) {
-  const grant = verifyGrant(req.body.grant || req.headers['x-grant']);
-  if (!grant.valid) {
-    return sendError(res, 403, 'GRANT_INVALID', `Grant không hợp lệ (${grant.reason})`);
-  }
-  if (grant.payload.workspaceId !== req.params.workspaceId || grant.payload.actorId !== req.wsAuth.actor.sub) {
-    return sendError(res, 403, 'GRANT_BOUND', 'Grant không thuộc workspace/actor này');
-  }
-  if (grant.payload.policyRevision !== req.wsAuth.policy) {
-    return sendError(res, 403, 'POLICY_CHANGED', 'Chính sách workspace đã thay đổi, cần authorize lại');
-  }
-  req.grant = grant.payload;
-  next();
+function auditGrant(consume = false) {
+  return (req, res, next) => {
+    const grant = verifyGrant(req.body.grant || req.headers['x-grant'], { consume });
+    if (!grant.valid) {
+      return sendError(res, 403, 'GRANT_INVALID', `Grant không hợp lệ (${grant.reason})`);
+    }
+    if (grant.payload.workspaceId !== req.params.workspaceId || grant.payload.actorId !== req.wsAuth.actor.sub) {
+      return sendError(res, 403, 'GRANT_BOUND', 'Grant không thuộc workspace/actor này');
+    }
+    if (grant.payload.policyRevision !== req.wsAuth.policy) {
+      return sendError(res, 403, 'POLICY_CHANGED', 'Chính sách workspace đã thay đổi, cần authorize lại');
+    }
+    req.grant = grant.payload;
+    next();
+  };
 }
 
-router.post('/:workspaceId/ai/tool-started', requireWorkspaceAuth, auditGrant, async (req, res, next) => {
+router.post('/:workspaceId/ai/tool-started', requireWorkspaceAuth, auditGrant(false), async (req, res, next) => {
   try {
     await aiAudit.recordToolStarted(req.params.workspaceId, {
       owner_id: req.wsAuth.workspace.owner_id,
@@ -585,7 +587,7 @@ router.post('/:workspaceId/ai/tool-started', requireWorkspaceAuth, auditGrant, a
   }
 });
 
-router.post('/:workspaceId/ai/tool-finished', requireWorkspaceAuth, auditGrant, async (req, res, next) => {
+router.post('/:workspaceId/ai/tool-finished', requireWorkspaceAuth, auditGrant(true), async (req, res, next) => {
   try {
     await aiAudit.recordToolFinished(req.params.workspaceId, {
       owner_id: req.wsAuth.workspace.owner_id,
