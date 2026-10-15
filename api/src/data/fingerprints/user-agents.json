@@ -1,0 +1,698 @@
+[
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 432,
+    "screenHeight": 984,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 3440,
+    "screenHeight": 1440,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 384,
+    "screenHeight": 854,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1280,
+    "screenHeight": 720,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1512,
+    "screenHeight": 982,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1280,
+    "screenHeight": 800,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1611,
+    "screenHeight": 1217,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 710,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 384,
+    "screenHeight": 832,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 ADG/11.1.4734 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1600,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "deviceCategory": "tablet",
+    "platform": "Linux armv81",
+    "screenWidth": 753,
+    "screenHeight": 1205,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 360,
+    "screenHeight": 800,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 AVG/130.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 800,
+    "screenHeight": 600,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1536,
+    "screenHeight": 960,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.6613.137 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1280,
+    "screenHeight": 720,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.0.0.0 (Edition std-1)",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1536,
+    "screenHeight": 864,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 384,
+    "screenHeight": 854,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.6533.72 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1344,
+    "screenHeight": 1344,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux armv81",
+    "screenWidth": 924,
+    "screenHeight": 1480,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 924,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 869,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36 EdgA/131.0.0.0",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-CA"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 3072,
+    "screenHeight": 1728,
+    "language": "en-GB"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1300,
+    "screenHeight": 730,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; ) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.234 Not/A)Brand/8 YaBrowser/24.7.3.1250 Yowser/2.5  Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "ru-RU"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/27.0 Chrome/125.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux armv81",
+    "screenWidth": 980,
+    "screenHeight": 1365,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 800,
+    "screenHeight": 600,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.109 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 800,
+    "screenHeight": 600,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 Edg/129.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1300,
+    "screenHeight": 730,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 Agency/98.8.8185.80",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 393,
+    "screenHeight": 786,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 OPR/115.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "es-ES"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.6533.99 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1920,
+    "screenHeight": 1200,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 360,
+    "screenHeight": 520,
+    "language": "en-GB"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.59 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1440,
+    "screenHeight": 2560,
+    "language": "en-GB"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 OPR/86.0.0.0",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 360,
+    "screenHeight": 780,
+    "language": "tr-TR"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 9; KFTRWI) AppleWebKit/537.36 (KHTML, like Gecko) Silk/130.4.1 like Chrome/130.0.6723.102 Safari/537.36",
+    "deviceCategory": "tablet",
+    "platform": "Linux armv81",
+    "screenWidth": 800,
+    "screenHeight": 1280,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1440,
+    "screenHeight": 900,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 14; SM-S908U Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.104 Mobile Safari/537.36 OPX/2.6",
+    "deviceCategory": "mobile",
+    "platform": "Linux aarch64",
+    "screenWidth": 384,
+    "screenHeight": 824,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 OPR/114.0.0.0",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1792,
+    "screenHeight": 1120,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.41 Mobile DuckDuckGo/5 Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux aarch64",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-CA"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36/3JIY3lI5-14",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-GB"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 320,
+    "screenHeight": 694,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 2752,
+    "screenHeight": 1152,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 13; SM-G781V Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.6778.104 Mobile Safari/537.36 GNews Android/2022199400",
+    "deviceCategory": "mobile",
+    "platform": "Linux aarch64",
+    "screenWidth": 360,
+    "screenHeight": 800,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "MacIntel",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1517,
+    "screenHeight": 852,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1536,
+    "screenHeight": 864,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 800,
+    "screenHeight": 600,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1200,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1706,
+    "screenHeight": 959,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.6367.61 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "ru-RU"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux armv81",
+    "screenWidth": 360,
+    "screenHeight": 640,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1366,
+    "screenHeight": 768,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Linux x86_64",
+    "screenWidth": 1241,
+    "screenHeight": 697,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "deviceCategory": "desktop",
+    "platform": "Win32",
+    "screenWidth": 1920,
+    "screenHeight": 1080,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 12; SM-G988U Build/SP1A.210812.016) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.104 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux aarch64",
+    "screenWidth": 412,
+    "screenHeight": 915,
+    "language": "en-US"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 9; KFMAWI Build/7331.4460N; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/126.0.6478.186 Safari/537.36",
+    "deviceCategory": "tablet",
+    "platform": "Linux armv8l",
+    "screenWidth": 800,
+    "screenHeight": 1280,
+    "language": "en-CA"
+  },
+  {
+    "userAgent": "Mozilla/5.0 (Linux; Android 15; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.104 Mobile Safari/537.36",
+    "deviceCategory": "mobile",
+    "platform": "Linux aarch64",
+    "screenWidth": 448,
+    "screenHeight": 998,
+    "language": "en"
+  }
+]

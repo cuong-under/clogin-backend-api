@@ -24,6 +24,7 @@ const workspacesRoutes = require('./routes/workspaces');
 const appRoutes = require('./routes/app');
 const engineRoutes = require('./routes/engine');
 const adminRoutes = require('./routes/admin');
+const fingerprintsRoutes = require('./routes/fingerprints');
 const { errorHandler } = require('./middleware/error');
 const { blockedIpGuard } = require('./middleware/blocked-ip');
 
@@ -83,6 +84,7 @@ app.use('/v1/profiles', profilesRoutes);
 app.use('/v1/workspaces', workspacesRoutes);
 app.use('/v1/app', appRoutes);
 app.use('/v1/engine', engineRoutes);
+app.use('/v1/fingerprints', fingerprintsRoutes);
 app.use('/v1/admin', adminRoutes);
 
 // Global Error Handler
