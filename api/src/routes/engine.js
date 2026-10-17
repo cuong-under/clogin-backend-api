@@ -82,10 +82,9 @@ router.get('/:name', downloadLimiter, async (req, res, next) => {
     // ETag do TA đặt, lấy từ manifest — app lưu giá trị này rồi so với manifest
     // ở lần khởi động sau, nên nó phải khớp manifest tuyệt đối.
     res.setHeader('ETag', `"${artifact.etag}"`);
-    // Nội dung bất biến theo sha256 => cache được vĩnh viễn.
-    // Thêm no-transform và Content-Encoding: identity để Cloudflare KHÔNG tự ý nén gzip/brotli
-    // đè lên file .zip (tránh lỗi 'error decoding response body' trên máy user).
-    res.setHeader('Cache-Control', 'no-transform, public, max-age=31536000, immutable');
+    // Bỏ cache ở Cloudflare proxy để Cloudflare KHÔNG cache bản nén gzip lỗi (Age > 0)
+    // và không nén gzip đè lên file zip thô 200MB.
+    res.setHeader('Cache-Control', 'no-transform, no-cache, no-store, must-revalidate');
     res.setHeader('Content-Encoding', 'identity');
     const len = upstream.headers.get('content-length');
     if (len) res.setHeader('Content-Length', len);
