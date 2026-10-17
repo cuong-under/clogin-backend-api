@@ -64,8 +64,8 @@ router.get('/:name', downloadLimiter, async (req, res, next) => {
       if (controller.signal.aborted) return undefined;
       throw {
         statusCode: 502,
-        code: 'ENGINE_UPSTREAM_UNREACHABLE',
-        message: `Không lấy được ${artifact.name} từ CDN: ${err.message}`
+        code: 'ENGINE_UPSTREAM_FAILED',
+        message: `Lỗi kết nối tới CDN: ${err.message}`
       };
     }
 
