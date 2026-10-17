@@ -83,7 +83,10 @@ router.get('/:name', downloadLimiter, async (req, res, next) => {
     // ở lần khởi động sau, nên nó phải khớp manifest tuyệt đối.
     res.setHeader('ETag', `"${artifact.etag}"`);
     // Nội dung bất biến theo sha256 => cache được vĩnh viễn.
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    // Thêm no-transform và Content-Encoding: identity để Cloudflare KHÔNG tự ý nén gzip/brotli
+    // đè lên file .zip (tránh lỗi 'error decoding response body' trên máy user).
+    res.setHeader('Cache-Control', 'no-transform, public, max-age=31536000, immutable');
+    res.setHeader('Content-Encoding', 'identity');
     const len = upstream.headers.get('content-length');
     if (len) res.setHeader('Content-Length', len);
 
